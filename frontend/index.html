@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sun Protector</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="style.css?v=2" />
+</head>
+<body>
+<header>
+  <h1>☀️ Sun Protector</h1>
+  <p>ИИ-ассистент по защите от солнца: риск UV, маршрут в тени, напоминания про SPF</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>Профиль</h2>
+    <label>Фототип кожи (Fitzpatrick)
+      <select id="phototype">
+        <option value="1">I — очень светлая, всегда обгорает</option>
+        <option value="2" selected>II — светлая, легко обгорает</option>
+        <option value="3">III — светло-смуглая</option>
+        <option value="4">IV — смуглая, редко обгорает</option>
+        <option value="5">V — тёмная</option>
+        <option value="6">VI — очень тёмная</option>
+      </select>
+    </label>
+
+    <div class="row">
+      <label>📷 Фото кожи
+        <input type="file" id="skinPhoto" accept="image/*" />
+      </label>
+      <button id="analyzeSkinBtn" type="button">Определить фототип по фото</button>
+    </div>
+    <div id="skinResult" class="hint"></div>
+
+    <label>Минут уже на улице
+      <input type="number" id="minutesOutside" value="30" min="0" />
+    </label>
+
+    <label>
+      <input type="checkbox" id="noSpfYet" />
+      Крем ещё не наносил(а)
+    </label>
+    <label id="spfMinutesRow">Крем нанесён (мин назад)
+      <input type="number" id="minutesSinceSpf" value="60" min="0" />
+    </label>
+
+    <label>
+      <input type="checkbox" id="sweating" />
+      Потею / купаюсь
+    </label>
+
+    <div class="row">
+      <label>📷 Фото этикетки крема
+        <input type="file" id="labelPhoto" accept="image/*" />
+      </label>
+      <button id="analyzeLabelBtn" type="button">Проверить крем</button>
+    </div>
+    <div id="labelResult" class="hint"></div>
+
+    <label>Свободный вопрос (опционально)
+      <textarea id="question" rows="2" placeholder="Например: как часто наносить крем при плавании?"></textarea>
+    </label>
+
+    <button id="recommendBtn" type="button" class="primary">Получить рекомендацию</button>
+    <div class="hint">Клик по карте: 1-й клик — точка старта, 2-й клик — точка назначения (маршрут в тени, опционально)</div>
+  </section>
+
+  <section class="panel map-panel">
+    <div id="map"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Результат</h2>
+    <div id="result">Заполните профиль и нажмите «Получить рекомендацию».</div>
+    <details id="traceDetails">
+      <summary>Ход выполнения workflow (LangGraph trace)</summary>
+      <ol id="traceList"></ol>
+    </details>
+    <details id="sourcesDetails">
+      <summary>Источники (RAG)</summary>
+      <ul id="sourcesList"></ul>
+    </details>
+  </section>
+</main>
+
+<div id="confirmModal" class="modal hidden">
+  <div class="modal-box">
+    <p id="confirmMessage"></p>
+    <div class="row">
+      <button id="confirmYes" class="primary">Да, отправить</button>
+      <button id="confirmNo">Нет</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js?v=2"></script>
+</body>
+</html>

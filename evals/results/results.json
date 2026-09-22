@@ -1,0 +1,280 @@
+{
+  "summary": {
+    "n": 30,
+    "accuracy": 1.0,
+    "avg_judge_score": 4.27,
+    "avg_judge_score_normalized": 0.853
+  },
+  "rows": [
+    {
+      "id": "t1_low_uv_type1",
+      "formula_correct": true,
+      "computed_band": "moderate",
+      "expected_band": "moderate",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога умеренный. Рекомендуется оставаться в тени или носить защитную одежду, чтобы минимизировать воздействие солнца. Повторное нанесение крема не требуется, так как вы еще не достигли безопасного времени пребывания на солнце.",
+      "judge_score": 5
+    },
+    {
+      "id": "t2_low_uv_type6",
+      "formula_correct": true,
+      "computed_band": "low",
+      "expected_band": "low",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога низкий (risk_band=low). Вы можете оставаться на улице еще 470 минут без повторного нанесения крема. Однако, если планируете находиться на солнце дольше, рекомендуется повторно нанести крем через 500 минут.",
+      "judge_score": 1
+    },
+    {
+      "id": "t3_moderate_type3_short",
+      "formula_correct": true,
+      "computed_band": "moderate",
+      "expected_band": "moderate",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога умеренный. Рекомендуется повторно нанести солнцезащитный крем сразу, так как прошло 15 минут с момента последнего нанесения. Продолжайте следить за временем и старайтесь не находиться на солнце более 50 минут без защиты.",
+      "judge_score": 5
+    },
+    {
+      "id": "t4_moderate_type3_long",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога высок (extreme). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как прошло уже 90 минут. После повторного нанесения вы сможете оставаться на солнце еще 50 минут, но следите за временем и избегайте длительного пребывания на улице.",
+      "judge_score": 5
+    },
+    {
+      "id": "t5_high_uv_type2",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога высокий (extreme). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как время безопасного пребывания на солнце истекло. После повторного нанесения вы сможете находиться на улице еще 14.3 минуты, но следите за временем и старайтесь избегать прямых солнечных лучей.",
+      "judge_score": 5
+    },
+    {
+      "id": "t6_high_uv_type5",
+      "formula_correct": true,
+      "computed_band": "high",
+      "expected_band": "high",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "У вас высокий риск солнечного ожога с текущим коэффициентом 0.53. Рекомендуется немедленно повторно нанести солнцезащитный крем, так как время до повторного нанесения истекло. Ограничьте пребывание на солнце, чтобы избежать повреждений кожи.",
+      "judge_score": 5
+    },
+    {
+      "id": "t7_extreme_uv_type1",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "У вас высокий риск солнечного ожога (extreme risk). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как безопасное время пребывания на солнце уже истекло. Избегайте дальнейшего пребывания на солнце без защиты.",
+      "judge_score": 5
+    },
+    {
+      "id": "t8_extreme_uv_type6",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "У вас высокий риск солнечного ожога (extreme risk). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как время до повторного нанесения истекло. Ограничьте пребывание на солнце и старайтесь находиться в тени.",
+      "judge_score": 5
+    },
+    {
+      "id": "t9_very_high_uv_type4",
+      "formula_correct": true,
+      "computed_band": "very_high",
+      "expected_band": "very_high",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога очень высокий. Рекомендуется немедленно повторно нанести солнцезащитный крем, так как прошло 40 минут с момента первого нанесения. После повторного нанесения вы сможете оставаться на солнце еще около 33 минут.",
+      "judge_score": 5
+    },
+    {
+      "id": "t10_zero_uv",
+      "formula_correct": true,
+      "computed_band": "low",
+      "expected_band": "low",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "С текущим UV индексом 0 и низким уровнем риска, вы можете продолжать находиться на улице без необходимости повторного нанесения крема. Однако, если UV индекс изменится, следите за временем и наносите крем повторно каждые 2 часа. В данный момент безопасно оставаться на улице.",
+      "judge_score": 5
+    },
+    {
+      "id": "t11_boundary_uv3",
+      "formula_correct": true,
+      "computed_band": "moderate",
+      "expected_band": "moderate",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога умеренный. Рекомендуется немедленно повторно нанести солнцезащитный крем, так как прошло 20 минут с момента последнего нанесения. После повторного нанесения вы сможете безопасно находиться на солнце еще около 46.7 минут.",
+      "judge_score": 5
+    },
+    {
+      "id": "t12_boundary_uv6",
+      "formula_correct": true,
+      "computed_band": "high",
+      "expected_band": "high",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "У вас высокий риск солнечного ожога, так как UV индекс 6 и вы уже находитесь на улице 20 минут. Рекомендуется немедленно повторно нанести солнцезащитный крем. Следите за временем: через 13.3 минуты (всего 33.3 минуты) вам нужно будет искать тень или завершать активность на солнце.",
+      "judge_score": 5
+    },
+    {
+      "id": "t13_boundary_uv8",
+      "formula_correct": true,
+      "computed_band": "very_high",
+      "expected_band": "very_high",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога очень высокий. Рекомендуется немедленно повторно нанести солнцезащитный крем, так как прошло 20 минут с момента последнего нанесения. После повторного нанесения вы сможете находиться на солнце еще 5 минут, но лучше искать тень.",
+      "judge_score": 5
+    },
+    {
+      "id": "t14_boundary_uv11",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "С текущим UV индексом 11 и риск-оценкой \"экстремальный\" вы находитесь в зоне высокого риска солнечного ожога. Рекомендуется немедленно повторно нанести солнцезащитный крем, так как время безопасного пребывания на солнце уже истекло. Избегайте дальнейшего пребывания на улице без защиты.",
+      "judge_score": 5
+    },
+    {
+      "id": "t15_spf_fresh",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "С текущим UV индексом 6 и фототипом 2 ваш риск солнечного ожога оценивается как экстремальный. Рекомендуется ограничить время пребывания на солнце до 16.7 минут. Повторно наносить крем не нужно, так как это не требуется в течение 110 минут. Будьте осторожны и старайтесь находиться в тени.",
+      "judge_score": 1
+    },
+    {
+      "id": "t16_spf_overdue",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога высокий (extreme). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как безопасное время пребывания на солнце истекло. Избегайте прямых солнечных лучей и ищите тень до повторного нанесения.",
+      "judge_score": 5
+    },
+    {
+      "id": "t17_spf_exact_boundary",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога высокий (extreme). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как время до повторного нанесения истекло. Ограничьте время на солнце до 16.7 минут, чтобы минимизировать риск.",
+      "judge_score": 1
+    },
+    {
+      "id": "t18_no_spf_yet_low_uv",
+      "formula_correct": true,
+      "computed_band": "moderate",
+      "expected_band": "moderate",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога умеренный. Рекомендуется оставаться на улице не более 20 минут, чтобы избежать перегрева кожи. Повторное нанесение крема не требуется, так как вы еще не достигли безопасного времени.",
+      "judge_score": 1
+    },
+    {
+      "id": "t19_no_spf_yet_high_uv",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "У вас высокий риск солнечного ожога (extreme risk). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как прошло 30 минут с момента первого нанесения. После повторного нанесения вы сможете находиться на солнце не более 12.5 минут. Будьте осторожны и старайтесь избегать прямых солнечных лучей.",
+      "judge_score": 5
+    },
+    {
+      "id": "t20_swimming_fresh",
+      "formula_correct": true,
+      "computed_band": "high",
+      "expected_band": "high",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога высокий. Рекомендуется покинуть солнце или искать тень, так как безопасное время пребывания на улице уже истекло. Повторно наносить крем следует через 20 минут.",
+      "judge_score": 1
+    },
+    {
+      "id": "t21_swimming_overdue",
+      "formula_correct": true,
+      "computed_band": "high",
+      "expected_band": "high",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Текущий риск солнечного ожога высокий. Рекомендуется немедленно повторно нанести солнцезащитный крем, так как прошло более 30 минут с момента последнего нанесения. После повторного нанесения старайтесь избегать прямых солнечных лучей и ищите тень.",
+      "judge_score": 5
+    },
+    {
+      "id": "t22_type1_long_exposure",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "У вас высокий риск солнечного ожога (extreme risk). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как время до повторного нанесения истекло. Ограничьте пребывание на солнце и ищите тень.",
+      "judge_score": 5
+    },
+    {
+      "id": "t23_type6_long_exposure",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "У вас высокий риск солнечного ожога (extreme risk). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как время до повторного нанесения истекло. Ограничьте пребывание на солнце и старайтесь находиться в тени.",
+      "judge_score": 5
+    },
+    {
+      "id": "t24_short_exposure_extreme_uv",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "С текущим UV индексом 12 и фототипом 2 вы находитесь в зоне экстремального риска. Рекомендуется немедленно уйти в тень и повторно нанести солнцезащитный крем, так как безопасное время пребывания на солнце уже истекло. Не забывайте обновлять защиту каждые 2 часа или после потения.",
+      "judge_score": 5
+    },
+    {
+      "id": "t25_long_exposure_low_uv",
+      "formula_correct": true,
+      "computed_band": "high",
+      "expected_band": "high",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "У вас высокий риск солнечного повреждения кожи, так как вы уже находитесь на улице 240 минут. Рекомендуется ограничить дальнейшее пребывание на солнце и искать тень. Повторное нанесение крема не требуется, так как вы еще не достигли безопасного времени.",
+      "judge_score": 5
+    },
+    {
+      "id": "t26_type3_typical_commute",
+      "formula_correct": true,
+      "computed_band": "moderate",
+      "expected_band": "moderate",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "У вас умеренный риск солнечного ожога, так как UV индекс 5 и вы уже находитесь на солнце 10 минут. Рекомендуется повторно нанести солнцезащитный крем сразу, так как время до повторного нанесения истекло. Ограничьте время пребывания на солнце до 30 минут, чтобы избежать ожога.",
+      "judge_score": 5
+    },
+    {
+      "id": "t27_type2_beach_day",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Текущий риск солнечного ожога крайне высокий (risk_band=extreme). Рекомендуется немедленно покинуть солнце или найти тень, так как безопасное время пребывания на улице истекло. Повторное нанесение крема не требуется, но через 30 минут, если вы все еще находитесь на улице, обязательно повторите нанесение.",
+      "judge_score": 3
+    },
+    {
+      "id": "t28_type5_midday_sport",
+      "formula_correct": true,
+      "computed_band": "very_high",
+      "expected_band": "very_high",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога очень высокий. Рекомендуется немедленно повторно нанести солнцезащитный крем, так как время до повторного нанесения истекло. Ограничьте дальнейшее пребывание на солнце или ищите тень.",
+      "judge_score": 5
+    },
+    {
+      "id": "t29_type4_cloudy_moderate",
+      "formula_correct": true,
+      "computed_band": "moderate",
+      "expected_band": "moderate",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск солнечного ожога умеренный. Рекомендуется немедленно повторно нанести солнцезащитный крем, так как прошло 45 минут с момента последнего нанесения. После повторного нанесения вы сможете безопасно находиться на солнце еще 55 минут.",
+      "judge_score": 5
+    },
+    {
+      "id": "t30_type1_extreme_worst_case",
+      "formula_correct": true,
+      "computed_band": "extreme",
+      "expected_band": "extreme",
+      "advice_model": "gpt-4o-mini (fallback, primary_error=AnthropicInvalidRequestError)",
+      "advice": "Ваш текущий риск получения солнечного ожога очень высокий (extreme). Рекомендуется немедленно повторно нанести солнцезащитный крем, так как прошло 60 минут с момента первого нанесения. После повторного нанесения вы сможете находиться на солнце не более 5.2 минут.",
+      "judge_score": 5
+    }
+  ]
+}

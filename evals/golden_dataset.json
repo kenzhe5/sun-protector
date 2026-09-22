@@ -1,0 +1,392 @@
+[
+  {
+    "id": "t1_low_uv_type1",
+    "note": "edge: lowest UV, most burn-prone skin",
+    "input": {
+      "phototype": 1,
+      "uv_index": 1,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "moderate",
+    "expected_reapply_due": false
+  },
+  {
+    "id": "t2_low_uv_type6",
+    "note": "edge: lowest UV, least burn-prone skin",
+    "input": {
+      "phototype": 6,
+      "uv_index": 1,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "low",
+    "expected_reapply_due": false
+  },
+  {
+    "id": "t3_moderate_type3_short",
+    "note": "typical short walk, moderate UV",
+    "input": {
+      "phototype": 3,
+      "uv_index": 4,
+      "minutes_outside": 15,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "moderate",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t4_moderate_type3_long",
+    "note": "typical long walk, moderate UV",
+    "input": {
+      "phototype": 3,
+      "uv_index": 4,
+      "minutes_outside": 90,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t5_high_uv_type2",
+    "note": "high UV, fair skin",
+    "input": {
+      "phototype": 2,
+      "uv_index": 7,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t6_high_uv_type5",
+    "note": "high UV, deep skin",
+    "input": {
+      "phototype": 5,
+      "uv_index": 7,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "high",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t7_extreme_uv_type1",
+    "note": "edge: extreme UV, most vulnerable skin",
+    "input": {
+      "phototype": 1,
+      "uv_index": 11,
+      "minutes_outside": 20,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t8_extreme_uv_type6",
+    "note": "edge: extreme UV, least vulnerable skin",
+    "input": {
+      "phototype": 6,
+      "uv_index": 11,
+      "minutes_outside": 20,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t9_very_high_uv_type4",
+    "note": "very high UV, medium skin",
+    "input": {
+      "phototype": 4,
+      "uv_index": 9,
+      "minutes_outside": 40,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "very_high",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t10_zero_uv",
+    "note": "edge: UV index 0 (night/heavy overcast)",
+    "input": {
+      "phototype": 3,
+      "uv_index": 0,
+      "minutes_outside": 60,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "low",
+    "expected_reapply_due": false
+  },
+  {
+    "id": "t11_boundary_uv3",
+    "note": "boundary: UV exactly 3 (moderate threshold)",
+    "input": {
+      "phototype": 3,
+      "uv_index": 3,
+      "minutes_outside": 20,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "moderate",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t12_boundary_uv6",
+    "note": "boundary: UV exactly 6 (high threshold)",
+    "input": {
+      "phototype": 3,
+      "uv_index": 6,
+      "minutes_outside": 20,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "high",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t13_boundary_uv8",
+    "note": "boundary: UV exactly 8 (very_high threshold)",
+    "input": {
+      "phototype": 3,
+      "uv_index": 8,
+      "minutes_outside": 20,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "very_high",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t14_boundary_uv11",
+    "note": "boundary: UV exactly 11 (extreme threshold)",
+    "input": {
+      "phototype": 3,
+      "uv_index": 11,
+      "minutes_outside": 20,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t15_spf_fresh",
+    "note": "sunscreen applied 10 min ago, not due",
+    "input": {
+      "phototype": 2,
+      "uv_index": 6,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": 10,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": false
+  },
+  {
+    "id": "t16_spf_overdue",
+    "note": "sunscreen applied 130 min ago, overdue",
+    "input": {
+      "phototype": 2,
+      "uv_index": 6,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": 130,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t17_spf_exact_boundary",
+    "note": "sunscreen applied exactly 120 min ago",
+    "input": {
+      "phototype": 2,
+      "uv_index": 6,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": 120,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t18_no_spf_yet_low_uv",
+    "note": "no sunscreen applied, but UV is low",
+    "input": {
+      "phototype": 2,
+      "uv_index": 2,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "moderate",
+    "expected_reapply_due": false
+  },
+  {
+    "id": "t19_no_spf_yet_high_uv",
+    "note": "no sunscreen applied, UV is high",
+    "input": {
+      "phototype": 2,
+      "uv_index": 8,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t20_swimming_fresh",
+    "note": "swimming, applied 40 min ago (under 60 limit)",
+    "input": {
+      "phototype": 3,
+      "uv_index": 6,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": 40,
+      "sweating_or_swimming": true
+    },
+    "expected_risk_band": "high",
+    "expected_reapply_due": false
+  },
+  {
+    "id": "t21_swimming_overdue",
+    "note": "swimming, applied 70 min ago (over 60 limit)",
+    "input": {
+      "phototype": 3,
+      "uv_index": 6,
+      "minutes_outside": 30,
+      "minutes_since_last_spf": 70,
+      "sweating_or_swimming": true
+    },
+    "expected_risk_band": "high",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t22_type1_long_exposure",
+    "note": "very burn-prone, long exposure, moderate UV",
+    "input": {
+      "phototype": 1,
+      "uv_index": 5,
+      "minutes_outside": 120,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t23_type6_long_exposure",
+    "note": "very sun-tolerant, long exposure, high UV",
+    "input": {
+      "phototype": 6,
+      "uv_index": 8,
+      "minutes_outside": 180,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t24_short_exposure_extreme_uv",
+    "note": "short exposure but extreme UV",
+    "input": {
+      "phototype": 2,
+      "uv_index": 12,
+      "minutes_outside": 5,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t25_long_exposure_low_uv",
+    "note": "long exposure but very low UV",
+    "input": {
+      "phototype": 4,
+      "uv_index": 1,
+      "minutes_outside": 240,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "high",
+    "expected_reapply_due": false
+  },
+  {
+    "id": "t26_type3_typical_commute",
+    "note": "typical commute scenario",
+    "input": {
+      "phototype": 3,
+      "uv_index": 5,
+      "minutes_outside": 10,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "moderate",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t27_type2_beach_day",
+    "note": "beach day, high UV, long exposure, swimming",
+    "input": {
+      "phototype": 2,
+      "uv_index": 9,
+      "minutes_outside": 180,
+      "minutes_since_last_spf": 30,
+      "sweating_or_swimming": true
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": false
+  },
+  {
+    "id": "t28_type5_midday_sport",
+    "note": "outdoor sport at midday, high UV",
+    "input": {
+      "phototype": 5,
+      "uv_index": 8,
+      "minutes_outside": 60,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "very_high",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t29_type4_cloudy_moderate",
+    "note": "cloudy but still moderate UV",
+    "input": {
+      "phototype": 4,
+      "uv_index": 3,
+      "minutes_outside": 45,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "moderate",
+    "expected_reapply_due": true
+  },
+  {
+    "id": "t30_type1_extreme_worst_case",
+    "note": "worst case: most vulnerable skin, extreme UV, long exposure, no SPF",
+    "input": {
+      "phototype": 1,
+      "uv_index": 13,
+      "minutes_outside": 60,
+      "minutes_since_last_spf": null,
+      "sweating_or_swimming": false
+    },
+    "expected_risk_band": "extreme",
+    "expected_reapply_due": true
+  }
+]
