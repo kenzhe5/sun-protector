@@ -1,86 +1,90 @@
 # ☀️ Sun Protector
 
-An AI assistant for sun safety: tells you the current UV risk for your skin type,
-finds the shadiest walking route to where you're going, and reminds you when to
-reapply sunscreen — grounded in public dermatology guidelines (WHO, AAD, EPA,
-SkinCancer.org), not a diagnosis.
+ИИ-ассистент по безопасности на солнце: показывает текущий UV-риск для вашего
+типа кожи, находит самый тенистый пеший маршрут до цели и напоминает, когда
+обновить солнцезащитный крем — на основе публичных дерматологических
+гайдлайнов (WHO, AAD, EPA, SkinCancer.org), а не диагностики.
 
-Built as a course capstone project (see `final_task.md` / `my_project.md` for the
-original brief). Full technical rationale is in [ARCHITECTURE.md](ARCHITECTURE.md);
-eval methodology and results are in [EVALS.md](EVALS.md).
+Сделано как финальный проект курса (см. `final_task.md` / `my_project.md` —
+исходное задание). Полное техническое обоснование — в [ARCHITECTURE.md](ARCHITECTURE.md);
+методология и результаты evals — в [EVALS.md](EVALS.md).
 
-![Recommendation screenshot](docs/screenshot-recommendation.png)
-![Human-in-the-loop confirmation](docs/screenshot-confirm.png)
+![Скриншот рекомендации](docs/screenshot-recommendation.png)
+![Human-in-the-loop подтверждение](docs/screenshot-confirm.png)
 
-## What it does
+## Что делает
 
-- **Risk assessment**: Fitzpatrick skin phototype + live UV index (Open-Meteo) →
-  deterministic risk score (low/moderate/high/very_high/extreme) and reapply timer.
-- **Shade-aware routing**: given a destination, ranks walking-route alternatives
-  by estimated shade coverage (OSRM routing + OpenStreetMap building data + real
-  solar position — not just shortest distance).
-- **Photo → phototype**: upload a skin photo, get an estimated Fitzpatrick type.
-- **Photo → label check**: upload a sunscreen label photo, get its SPF/ingredients
-  read via OCR and checked against guideline recommendations.
-- **Guideline Q&A**: ask a free-text question, answered via RAG over a real
-  WHO/AAD/EPA/SkinCancer.org corpus with cited sources.
-- **Urgent-risk confirmation**: at very-high/extreme risk, the workflow pauses
-  and asks you to confirm before "sending" an urgent notification
-  (human-in-the-loop).
+- **Оценка риска**: фототип кожи по Фицпатрику + живой UV-индекс (Open-Meteo) →
+  детерминированный риск-скор (low/moderate/high/very_high/extreme) и таймер
+  повторного нанесения крема.
+- **Маршрут с учётом тени**: для заданной точки назначения ранжирует
+  альтернативные пешие маршруты по доле тени (роутинг OSRM + данные о зданиях
+  OpenStreetMap + реальная позиция солнца — а не просто по кратчайшему
+  расстоянию).
+- **Фото → фототип**: загрузите фото кожи — получите оценку типа по
+  Фицпатрику.
+- **Фото → проверка этикетки**: загрузите фото этикетки крема — SPF и состав
+  считываются через OCR и сверяются с рекомендациями гайдлайнов.
+- **Вопросы по гайдлайнам**: свободный вопрос отвечается через RAG по
+  реальному корпусу WHO/AAD/EPA/SkinCancer.org с указанием источников.
+- **Подтверждение при срочном риске**: при очень высоком/экстремальном риске
+  workflow останавливается и просит подтвердить отправку срочного
+  уведомления (human-in-the-loop).
 
-## Course requirement checklist
+## Чек-лист требований курса
 
-| Requirement | Where |
+| Требование | Где |
 |---|---|
-| LangGraph multi-step workflow (branching, cycle, human-in-the-loop) | `agent-service/app/graph/` |
-| MCP server, 3 tools | `mcp-server/` |
+| Многошаговый workflow LangGraph (ветвление, цикл, human-in-the-loop) | `agent-service/app/graph/` |
+| MCP-сервер, 3 тула | `mcp-server/` |
 | Skill (SKILL.md) | `skills/sunscreen-reapplication-advisor/SKILL.md` |
-| RAG pipeline (chunking, embeddings, vector DB) | `agent-service/app/rag/` |
-| Document/web scraping for RAG corpus | `agent-service/data/corpus/` (fetched from WHO/AAD/EPA/SkinCancer.org) |
-| Multimodality (vision) | `agent-service/app/multimodal/` |
-| LangSmith tracing | `agent-service/app/tracing.py` (set `LANGCHAIN_API_KEY` in `.env`) |
-| Golden dataset (30 examples) + evals | `evals/golden_dataset.json`, `evals/run_evals.py`, [EVALS.md](EVALS.md) |
-| A/B experiment | `evals/ab_test.py`, [EVALS.md](EVALS.md) |
-| LLM + hyperparameter choice, documented | [ARCHITECTURE.md](ARCHITECTURE.md) §3, `app/config.py` |
-| Guardrails (bonus) | `agent-service/app/guardrails.py` |
-| Fallback between models (bonus) | `app/config.py:call_with_fallback` — exercised for real, see EVALS.md |
-| Docker / docker-compose (bonus) | `Dockerfile`, `docker-compose.yml` |
-| Web frontend | `frontend/` (static, no build step) |
+| RAG-пайплайн (chunking, эмбеддинги, векторная БД) | `agent-service/app/rag/` |
+| Обработка документов/скрапинг сайтов для RAG-корпуса | `agent-service/data/corpus/` (собрано с WHO/AAD/EPA/SkinCancer.org) |
+| Мультимодальность (vision) | `agent-service/app/multimodal/` |
+| LangSmith-трейсинг | `agent-service/app/tracing.py` (задать `LANGCHAIN_API_KEY` в `.env`) |
+| Golden dataset (30 примеров) + evals | `evals/golden_dataset.json`, `evals/run_evals.py`, [EVALS.md](EVALS.md) |
+| A/B эксперимент | `evals/ab_test.py`, [EVALS.md](EVALS.md) |
+| Обоснованный выбор LLM и гиперпараметров | [ARCHITECTURE.md](ARCHITECTURE.md) §3, `app/config.py` |
+| Guardrails (бонус) | `agent-service/app/guardrails.py` |
+| Fallback между моделями (бонус) | `app/config.py:call_with_fallback` — реально сработал, см. EVALS.md |
+| Docker / docker-compose (бонус) | `Dockerfile`, `docker-compose.yml` |
+| Веб-фронтенд | `frontend/` (статика, без сборки) |
 
-## Run it
+## Запуск
 
-### Option A — Docker (simplest)
+### Вариант A — Docker (проще всего)
 
 ```bash
-cp .env.example .env   # then fill in CLAUDE_API_KEY / OPENAI_API_KEY
+cp .env.example .env   # затем впишите CLAUDE_API_KEY / OPENAI_API_KEY
 docker compose up --build
-# first time only, in another shell: ingest the RAG corpus
+# только в первый раз, в другом терминале: загрузить RAG-корпус
 docker compose exec sun-protector python -m app.rag.ingest
 ```
 
-Open http://localhost:8000
+Открыть http://localhost:8000
 
-### Option B — local
+### Вариант B — локально
 
-Requires Python 3.11+.
+Нужен Python 3.11+.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r agent-service/requirements.txt -r mcp-server/requirements.txt
 
-cp .env.example .env   # then fill in CLAUDE_API_KEY / OPENAI_API_KEY
+cp .env.example .env   # затем впишите CLAUDE_API_KEY / OPENAI_API_KEY
 
 cd agent-service
-python -m app.rag.ingest        # one-time: embed the guideline corpus into Chroma
+python -m app.rag.ingest        # один раз: заэмбеддить корпус гайдлайнов в Chroma
 uvicorn app.main:app --reload --port 8000
 ```
 
-Open http://localhost:8000 — the same FastAPI process serves both the API and
-the static frontend. Allow location access for the map to center on you, or
-just click anywhere on the map to set your start point.
+Открыть http://localhost:8000 — один и тот же процесс FastAPI отдаёт и API, и
+статический фронтенд. Разрешите доступ к геолокации, чтобы карта
+центрировалась на вас, либо просто кликните в любую точку карты, чтобы
+задать точку старта.
 
-### Run evals / A/B test
+### Запуск evals / A/B-теста
 
 ```bash
 cd evals
@@ -88,7 +92,7 @@ python run_evals.py     # -> results/results.json
 python ab_test.py       # -> results/ab_test_results.json
 ```
 
-### Use the MCP server standalone (e.g. from Claude Desktop)
+### Использование MCP-сервера отдельно (например, из Claude Desktop)
 
 ```json
 {
@@ -101,40 +105,44 @@ python ab_test.py       # -> results/ab_test_results.json
 }
 ```
 
-## Manual verification performed during this build
+## Ручная проверка, выполненная при сборке проекта
 
-Every path below was exercised against the live app (not just unit-tested) while
-building this: MCP tool calls over the real stdio protocol (UV forecast, pharmacy
-search, shade routing — all against live Open-Meteo/OSRM/OpenStreetMap APIs);
-the full LangGraph workflow including the human-in-the-loop `interrupt()`/resume
-cycle; RAG retrieval returning correctly-cited guideline chunks; the automatic
-Claude→OpenAI fallback (triggered for real — the Anthropic key ran out of credit
-mid-build, see EVALS.md); guardrails blocking a prompt-injection attempt; and the
-frontend end-to-end via a real browser (map render, route drawing, confirm
-dialog) — screenshots above are from that session, not mockups.
+Каждый из пунктов ниже был реально прогнан через работающее приложение (не
+только юнит-тестами) во время разработки: вызовы MCP-тулов по настоящему
+stdio-протоколу (UV-прогноз, поиск аптек, маршрут в тени — все против живых
+API Open-Meteo/OSRM/OpenStreetMap); полный LangGraph workflow, включая цикл
+human-in-the-loop `interrupt()`/resume; RAG-retrieval с корректно
+процитированными чанками гайдлайнов; автоматический fallback Claude→OpenAI
+(сработал по-настоящему — у ключа Anthropic закончился баланс прямо во время
+сборки, см. EVALS.md); guardrails, заблокировавшие попытку prompt injection;
+и фронтенд целиком через настоящий браузер (рендер карты, построение
+маршрута, диалог подтверждения) — скриншоты выше сделаны в той самой сессии,
+а не нарисованы вручную.
 
-## Known limitations
+## Известные ограничения
 
-- Shade routing is a heuristic (sun position + building proximity), not true
-  shadow ray-casting — see `mcp-server/tools/shade_route.py`.
-- Risk formula uses commonly-cited dermatology teaching baselines, not a
-  clinically calibrated per-person model — informational, not diagnostic.
-- No auth/roles, no CI pipeline, no production deployment — out of scope for
-  the course timeline (see ARCHITECTURE.md §5 for the full list, said out loud
-  rather than hidden).
-- **Security note**: this repo's `.env` at one point contained a live API key
-  pasted directly into a chat session; that key should be treated as
-  compromised and rotated before any real use. `.env` is gitignored.
+- Маршрутизация по тени — эвристика (позиция солнца + близость зданий), а не
+  настоящий raycasting теней — см. `mcp-server/tools/shade_route.py`.
+- Формула риска использует общепринятые дерматологические учебные ориентиры,
+  а не клинически калиброванную персональную модель — информационно, не
+  диагностически.
+- Нет auth/ролей, нет CI-пайплайна, нет production-деплоя — вне рамок
+  таймлайна курса (полный список в ARCHITECTURE.md §5, проговорено честно, а
+  не спрятано).
+- **Замечание по безопасности**: в `.env` этого репозитория в какой-то момент
+  оказался живой API-ключ, вставленный прямо в чат-сессию; этот ключ следует
+  считать скомпрометированным и заменить перед любым реальным использованием.
+  `.env` добавлен в gitignore.
 
-## Repo layout
+## Структура репозитория
 
 ```
-agent-service/   FastAPI app, LangGraph workflow, RAG, multimodal, config
-mcp-server/      Standalone MCP server (3 tools)
+agent-service/   FastAPI-приложение, LangGraph workflow, RAG, мультимодальность, конфиг
+mcp-server/      Отдельный MCP-сервер (3 тула)
 skills/          Claude Skill (SKILL.md)
-frontend/        Static web UI (no build step)
-evals/           Golden dataset, eval runner, A/B test
-docs/            Screenshots
-ARCHITECTURE.md  Design rationale, request-flow diagram, trade-offs
-EVALS.md         Metrics, golden dataset rationale, A/B results
+frontend/        Статический веб-интерфейс (без сборки)
+evals/           Golden dataset, eval runner, A/B-тест
+docs/            Скриншоты
+ARCHITECTURE.md  Обоснование архитектуры, диаграмма потока запроса, trade-off'ы
+EVALS.md         Метрики, обоснование golden dataset, результаты A/B
 ```

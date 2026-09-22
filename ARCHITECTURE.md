@@ -1,17 +1,17 @@
-# Architecture — Sun Protector
+# Архитектура — Sun Protector
 
-## 1. Problem and user
+## 1. Проблема и пользователь
 
-**User:** someone planning to be outside (walking, commuting, beach day) who wants
-a plain answer to "is it currently safe for my skin, and how do I minimize sun
-exposure on this specific walk" — instead of manually checking a UV widget,
-remembering their own skin type, and guessing whether a shaded route exists.
+**Пользователь:** человек, который планирует быть на улице (прогулка, дорога на работу,
+пляж) и хочет простой ответ на вопрос «безопасно ли мне сейчас находиться на солнце
+и как минимизировать экспозицию на этом конкретном маршруте» — вместо того чтобы
+вручную смотреть UV-виджет, помнить свой тип кожи и гадать, есть ли тенистый путь.
 
-**Not a medical device.** All advice is derived from public guidelines (WHO, AAD,
-EPA, SkinCancer.org) plus a documented formula — not a dermatologist, not a
-diagnosis. Every response carries a disclaimer (see `guardrails.py`).
+**Это не медицинское устройство.** Все советы построены на публичных гайдлайнах (WHO,
+AAD, EPA, SkinCancer.org) и задокументированной формуле — не на дерматологе и не на
+диагностике. Каждый ответ сопровождается дисклеймером (см. `guardrails.py`).
 
-## 2. Request flow (one user request, end to end)
+## 2. Поток одного запроса (от пользователя до ответа)
 
 ```
 Browser (frontend/app.js)
@@ -28,92 +28,96 @@ LangGraph workflow (agent-service/app/graph/graph.py)
   fetch_uv  ───────────────► MCP tool: get_uv_forecast_tool ───► Open-Meteo API
     │
     ▼
-  assess_risk  (deterministic formula, app/graph/risk.py)
+  assess_risk  (детерминированная формула, app/graph/risk.py)
     │
     ├─[risk_band in {very_high, extreme}]──► urgent_advice ──► interrupt()
     │                                           │                  │
-    │                                           │      (frontend shows confirm dialog,
+    │                                           │      (фронтенд показывает диалог
+    │                                           │       подтверждения,
     │                                           │       POST /api/resume {confirmed})
     │                                           ▼
     │                                     plan_route ◄───────────┘
     └─[else]───────────────────────────────────┤
                                                  ▼
                                     plan_route ──► MCP tool: get_shade_route_tool
-                                                     (OSRM alternatives + OSM buildings
-                                                      + solar position → shade_fraction)
+                                                     (альтернативы OSRM + здания OSM
+                                                      + позиция солнца → shade_fraction)
                                                  │
                                                  ▼
-                                          rag_answer  (if user asked a free-text question)
-                                                 │       Chroma similarity_search over
-                                                 │       WHO/AAD/EPA/SkinCancer.org corpus
+                                          rag_answer  (если задан свободный вопрос)
+                                                 │       Chroma similarity_search по
+                                                 │       корпусу WHO/AAD/EPA/SkinCancer.org
                                                  ▼
                                        compose_response
-                                          (Claude primary → OpenAI fallback,
+                                          (Claude основной → OpenAI fallback,
                                            guardrails.check_output)
                                                  │
                                     ┌────────────┴─────────────┐
-                              [walk still going, reapply due]  │ [else]
+                              [прогулка не закончена,          │ [иначе]
+                               пора обновить крем]              │
                                     ▼                          ▼
                              recheck_update ──► assess_risk   END
-                             (loops back, capped at 1 cycle)
+                             (возврат по циклу, максимум 1 раз)
 ```
 
-This single graph is the "multi-step workflow with conditional logic" required by
-the course: **branching** (`risk_branch`), a **cycle** (`recheck_branch` →
-`recheck_update` → back to `assess_risk`, capped at `MAX_RECHECKS=1` to keep the
-demo bounded), and a **human-in-the-loop gate** (`urgent_advice`'s
-`langgraph.types.interrupt()`, resumed via `Command(resume=...)` from
-`/api/resume`).
+Этот единый граф и есть требуемый курсом «многошаговый workflow с условной
+логикой»: **ветвление** (`risk_branch`), **цикл** (`recheck_branch` →
+`recheck_update` → снова на `assess_risk`, ограничен `MAX_RECHECKS=1`, чтобы демо
+оставалось предсказуемым) и **human-in-the-loop подтверждение** (`interrupt()` в
+`urgent_advice`, возобновляется через `Command(resume=...)` из `/api/resume`).
 
-## 3. Components and why each exists
+## 3. Компоненты и почему выбраны именно они
 
-| Component | What | Why this, not an alternative |
+| Компонент | Что | Почему так, а не иначе |
 |---|---|---|
-| **Orchestration** | LangGraph `StateGraph` | Needed explicit branching + a cycle + a pause/resume gate. CrewAI's role-based crews fit multi-agent delegation better than a single deterministic state machine; Parlant is optimized for conversational guardrail-heavy agents. LangGraph's graph model maps directly onto the risk→route→advice pipeline with the checkpointer giving human-in-the-loop "for free". |
-| **MCP server** (`mcp-server/`) | Standalone MCP server, stdio transport, 3 tools: `get_uv_forecast`, `find_nearby_pharmacy`, `get_shade_route` | MCP vs. a plain internal function call: the tools are genuinely reusable outside this app (e.g. loadable directly into Claude Desktop) and the boundary forces a clean, versioned tool contract instead of ad hoc function imports. `get_shade_route` in particular does real work (OSRM + Overpass + a NOAA solar-position formula), which justifies a dedicated service boundary. |
-| **RAG** | Chroma (local, file-based) + OpenAI `text-embedding-3-small`, recursive character chunking (800/100) | Qdrant/Pinecone need running infra or a hosted account for what is currently a ~20-chunk corpus — not worth the ops cost yet; Chroma is a drop-in swap later if the corpus grows. Embedding choice: Anthropic has no embeddings API, and `text-embedding-3-small` is cheap/good enough for short guideline prose. No reranker — corpus is small enough that top-k similarity is already precise; documented as a explicit simplification, not an oversight. |
-| **Multimodality** | Vision (skin-tone photo → Fitzpatrick phototype; sunscreen label photo → OCR of SPF/ingredients/expiry), via the same Claude→OpenAI fallback path | Chosen because it feeds directly into the risk formula (phototype) and into a real guideline cross-check (label SPF vs. AAD's "SPF 30+" recommendation) — not a bolted-on demo feature. |
-| **Skill** (`skills/sunscreen-reapplication-advisor/SKILL.md`) | Documents the exact formula in `risk.py` for an LLM to apply when a user asks a free-form question with no structured API call to make | The formula runs as plain Python inside the app (faster/cheaper/exact for arithmetic); the Skill exists for the case an LLM is reasoning conversationally and needs the same formula in natural language. |
-| **LLM** | Primary: Claude (`claude-sonnet-5`, `claude-haiku-4-5` for cheap/fast judge calls). Fallback: `gpt-4o-mini`. | See `agent-service/app/config.py` docstring. Claude for the main synthesis step (safety-sensitive, instruction-following matters); Haiku for cheap structured/judge calls; OpenAI as the automatic fallback if Anthropic errors, rate-limits, or (as happened during this build — see EVALS.md) runs out of credit. `call_with_fallback()` wraps every LLM call in the app, including vision. |
-| **Guardrails** | Hand-rolled regex-based input/output filters (`app/guardrails.py`) | Simple, auditable in one file for the defense, rather than pulling in a framework for ~5 patterns: blocks prompt-injection phrasing, redacts email/phone from inputs, blocks language that reads as a cancer diagnosis, and appends a "not a dermatologist" disclaimer to every output. |
-| **Tracing** | LangSmith via env vars (`LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`) | No custom code needed — LangChain/LangGraph auto-instrument every LLM call and every graph node when these are set. |
-| **Frontend** | One static page (`frontend/`, vanilla JS + Leaflet, no build step), served directly by FastAPI's `StaticFiles` | The course only requires "a real frontend, not CLI" — not a specific framework. A single HTML/JS/CSS bundle with no npm/webpack step means the whole app is one process (`uvicorn`) to run and one Docker image to build. Leaflet + OpenStreetMap needs no API key, unlike Google Maps JS. |
+| **Оркестрация** | LangGraph `StateGraph` | Нужны были явное ветвление + цикл + пауза/возобновление. Ролевые «команды» CrewAI лучше подходят для делегирования между несколькими агентами, чем для одного детерминированного конечного автомата; Parlant оптимизирован под разговорных guardrail-агентов. Граф LangGraph напрямую ложится на пайплайн риск→маршрут→совет, а checkpointer даёт human-in-the-loop «бесплатно». |
+| **MCP-сервер** (`mcp-server/`) | Отдельный MCP-сервер, stdio-транспорт, 3 тула: `get_uv_forecast`, `find_nearby_pharmacy`, `get_shade_route` | MCP против обычного внутреннего вызова функции: инструменты по-настоящему переиспользуемы вне этого приложения (например, их можно подключить прямо в Claude Desktop), а граница сервиса вынуждает иметь чистый, версионируемый контракт инструмента вместо произвольных импортов функций. `get_shade_route` в частности делает реальную работу (OSRM + Overpass + формула позиции солнца NOAA), что оправдывает отдельную границу сервиса. |
+| **RAG** | Chroma (локально, файлово) + OpenAI `text-embedding-3-small`, рекурсивный чанкинг по символам (800/100) | Qdrant/Pinecone требуют работающей инфраструктуры или хостинг-аккаунта ради корпуса на ~20 чанков — пока не стоит эксплуатационных затрат; Chroma можно заменить без переписывания логики, если корпус вырастет. Выбор эмбеддингов: у Anthropic нет API эмбеддингов, а `text-embedding-3-small` дёшев и достаточно хорош для короткой прозы гайдлайнов. Реранкер не используется — корпус настолько мал, что top-k по косинусному сходству уже достаточно точен; это осознанное упрощение, а не недосмотр. |
+| **Мультимодальность** | Vision (фото тона кожи → фототип Фицпатрика; фото этикетки крема → OCR SPF/состава/срока годности), через тот же fallback-путь Claude→OpenAI | Выбрано потому, что напрямую питает формулу риска (фототип) и реальную сверку с гайдлайном (SPF на этикетке против рекомендации AAD «SPF 30+») — а не приделано для галочки. |
+| **Skill** (`skills/sunscreen-reapplication-advisor/SKILL.md`) | Документирует ту же формулу, что в `risk.py`, чтобы LLM могла применить её при свободном вопросе без structured-вызова API | Формула выполняется как обычный Python внутри приложения (для арифметики это быстрее/дешевле/точнее); Skill существует на случай, когда LLM рассуждает в диалоге и ей нужна та же формула на естественном языке. |
+| **LLM** | Основная: Claude (`claude-sonnet-5`, `claude-haiku-4-5` для дешёвых/быстрых judge-вызовов). Fallback: `gpt-4o-mini`. | См. докстринг `agent-service/app/config.py`. Claude — для финального синтеза (чувствительно к безопасности, важно точное следование инструкциям); Haiku — для дешёвых structured/judge-вызовов; OpenAI — автоматический fallback, если Anthropic отвечает ошибкой, рейт-лимитом или (как случилось при разработке — см. EVALS.md) заканчивается баланс. `call_with_fallback()` оборачивает каждый LLM-вызов в приложении, включая vision. |
+| **Guardrails** | Самописные regex-фильтры входа/выхода (`app/guardrails.py`) | Просто и легко проверить в одном файле на защите, вместо того чтобы тащить целый фреймворк ради ~5 паттернов: блокирует формулировки prompt injection, редактирует email/телефон во входных данных, блокирует формулировки, похожие на диагноз рака, и добавляет дисклеймер «не дерматолог» к каждому ответу. |
+| **Трейсинг** | LangSmith через переменные окружения (`LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`) | Кастомный код не нужен — LangChain/LangGraph автоматически инструментируют каждый LLM-вызов и каждый узел графа, когда эти переменные заданы. |
+| **Фронтенд** | Одна статическая страница (`frontend/`, чистый JS + Leaflet, без сборки), отдаётся напрямую через `StaticFiles` FastAPI | Курс требует лишь «реальный фронтенд, не CLI» — без привязки к фреймворку. Один HTML/JS/CSS-бандл без npm/webpack означает, что всё приложение — это один процесс (`uvicorn`) для запуска и один Docker-образ для сборки. Leaflet + OpenStreetMap не требует API-ключа, в отличие от Google Maps JS. |
 
-## 4. What's independent / replaceable vs. intentionally coupled
+## 4. Что независимо/заменяемо, а что сознательно связано
 
-- **Independent, swappable:** the MCP server is a separate process reachable over
-  stdio — it could be swapped for a hosted MCP server without touching the graph
-  code beyond `mcp_client.py`. The vector store (`rag/retriever.py`) is isolated
-  behind `retrieve()` — swapping Chroma for Qdrant/pgvector only touches that file.
-  The LLM provider is isolated behind `config.call_with_fallback()` — swapping
-  models means changing env vars, not code.
-- **Deliberately coupled:** `risk.py`'s formula is inlined into `assess_risk_node`
-  rather than exposed as an MCP tool or a separate microservice — it's a pure,
-  fast, free function; wrapping it in a network boundary would add latency and
-  failure modes for no benefit. The frontend talks to the backend same-origin
-  (no separate API gateway) — appropriate for a single-team course project, not
-  necessarily for a multi-team production system.
+- **Независимо, взаимозаменяемо:** MCP-сервер — отдельный процесс, доступный по
+  stdio — его можно заменить на хостируемый MCP-сервер, не трогая код графа кроме
+  `mcp_client.py`. Векторное хранилище (`rag/retriever.py`) изолировано за
+  функцией `retrieve()` — замена Chroma на Qdrant/pgvector затронет только этот
+  файл. Провайдер LLM изолирован за `config.call_with_fallback()` — смена модели
+  означает изменение переменных окружения, а не кода.
+- **Сознательно связано:** формула из `risk.py` встроена прямо в `assess_risk_node`,
+  а не вынесена в MCP-тул или отдельный микросервис — это чистая, быстрая,
+  бесплатная функция; оборачивать её сетевой границей добавило бы задержку и
+  точки отказа без всякой выгоды. Фронтенд общается с бэкендом same-origin (без
+  отдельного API-шлюза) — уместно для курсового проекта одной команды, но не
+  обязательно для мультикомандной продакшен-системы.
 
-## 5. Known simplifications (said out loud, not hidden)
+## 5. Известные упрощения (проговорены вслух, а не скрыты)
 
-- `get_shade_route`'s shade scoring is a heuristic (building proximity + sun
-  azimuth, not true ray-cast shadows from building height data) — documented in
-  `mcp-server/tools/shade_route.py`'s docstring.
-- The risk formula's baseline burn-times are commonly-cited dermatology teaching
-  values, not a per-user calibrated model — real burn time varies with altitude,
-  reflection (water/sand/snow), medication, and individual variation.
-- RAG corpus is 4 documents / ~20 chunks — enough to demonstrate a real pipeline
-  with real sources, not a production-scale knowledge base.
-- No reranker, no semantic cache, no auth/roles, no CI pipeline — out of scope
-  given the timeline; see the course's "recommended, not required" list.
+- Оценка тени в `get_shade_route` — эвристика (близость зданий + азимут солнца,
+  а не полный raycasting теней по высотам зданий) — задокументировано в
+  докстринге `mcp-server/tools/shade_route.py`.
+  Базовые значения времени до ожога в формуле риска — общепринятые
+  дерматологические учебные ориентиры, а не калиброванная под конкретного
+  пользователя модель — реальное время до ожога зависит от высоты над уровнем
+  моря, отражения (вода/песок/снег), медикаментов и индивидуальных особенностей.
+- RAG-корпус — 4 документа / ~20 чанков — достаточно, чтобы показать реальный
+  пайплайн на реальных источниках, но не база знаний продакшен-масштаба.
+- Нет реранкера, нет семантического кэша, нет auth/ролей, нет CI-пайплайна — вне
+  рамок с учётом таймлайна; см. список «рекомендуется, но не обязательно» в
+  задании курса.
 
-## 6. Cost / latency / fallback
+## 6. Стоимость / латентность / fallback
 
-- A typical `/api/recommend` call: 1 MCP call (UV, ~0.3s), optionally 1 more (route,
-  ~1-3s depending on Overpass load), 1 RAG retrieval (~0.1s, local), 1 LLM call for
-  synthesis. Dominant cost/latency is the final LLM call.
-- If the primary (Claude) LLM is unavailable for any reason, `call_with_fallback()`
-  transparently retries on `gpt-4o-mini` and tags the response with which model
-  actually answered (`model_used` field) — this is not hypothetical: it was
-  exercised for real during this build when the Anthropic key ran out of credit
-  (see EVALS.md).
+- Типичный вызов `/api/recommend`: 1 MCP-вызов (UV, ~0.3с), опционально ещё один
+  (маршрут, ~1-3с в зависимости от загрузки Overpass), 1 RAG-retrieval (~0.1с,
+  локально), 1 LLM-вызов для синтеза. Основная доля стоимости/латентности —
+  финальный LLM-вызов.
+- Если основная модель (Claude) недоступна по любой причине, `call_with_fallback()`
+  прозрачно переключается на `gpt-4o-mini` и помечает ответ тем, какая модель
+  реально ответила (поле `model_used`) — это не гипотетический сценарий: он был
+  реально отработан во время разработки, когда у ключа Anthropic закончился
+  баланс (см. EVALS.md).
