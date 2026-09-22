@@ -1,4 +1,4 @@
-"""Lightweight, dependency-free guardrails (bonus requirement 4).
+"""Lightweight, dependency-free input/output guardrails.
 
 Deliberately simple / hand-rolled rather than pulling in Guardrails AI or
 NeMo Guardrails, so the logic is auditable in one file for the defense.

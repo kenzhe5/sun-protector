@@ -45,9 +45,9 @@
 | Golden dataset (30 примеров) + evals | `evals/golden_dataset.json`, `evals/run_evals.py`, [EVALS.md](EVALS.md) |
 | A/B эксперимент | `evals/ab_test.py`, [EVALS.md](EVALS.md) |
 | Обоснованный выбор LLM и гиперпараметров | [ARCHITECTURE.md](ARCHITECTURE.md) §3, `app/config.py` |
-| Guardrails (бонус) | `agent-service/app/guardrails.py` |
-| Fallback между моделями (бонус) | `app/config.py:call_with_fallback` — реально сработал, см. EVALS.md |
-| Docker / docker-compose (бонус) | `Dockerfile`, `docker-compose.yml` |
+| Guardrails | `agent-service/app/guardrails.py` |
+| Fallback между моделями | `app/config.py:call_with_fallback` — реально сработал, см. EVALS.md |
+| Docker / docker-compose | `Dockerfile`, `docker-compose.yml` |
 | Веб-фронтенд | `frontend/` (статика, без сборки) |
 
 ## Запуск
