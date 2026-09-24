@@ -18,6 +18,7 @@ from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
+from langsmith import traceable
 
 from . import config, geo
 from .graph.graph import get_graph
@@ -282,6 +283,9 @@ def _model_name(msg: AIMessage) -> str:
     return meta.get("model_name") or meta.get("model") or "?"
 
 
+# Одно сообщение = один трейс в LangSmith: вызовы LLM, инструменты и граф
+# LangGraph видны внутри него как вложенные шаги.
+@traceable(name="Сообщение в чат", run_type="chain")
 async def run_chat(
     history: list[dict[str, str]], ctx: ChatContext, route: tuple[dict, dict] | None = None
 ) -> dict[str, Any]:
