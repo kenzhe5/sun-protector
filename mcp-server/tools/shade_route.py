@@ -2,10 +2,11 @@
 
 Real, if simplified, shade-aware pedestrian routing:
 
-1. Ask OSRM's public foot-routing demo server for route alternatives
-   between origin and destination (router.project-osrm.org).
-2. For each alternative, sample points along the path and query the
-   OpenStreetMap Overpass API for buildings within a small buffer.
+1. Ask the FOSSGIS OSRM foot-routing server for walking route alternatives
+   between origin and destination (routing.openstreetmap.de; the
+   router.project-osrm.org demo only has a car profile, whatever the URL says).
+2. Sample up to 40 points per alternative and fetch buildings near all of
+   them with a single OpenStreetMap Overpass request (60 m buffer).
 3. Compute the sun's azimuth/elevation for "now" at the route's location
    using a standard NOAA solar-position approximation (no external API,
    pure math — this is the "UV/skin" domain reasoning the agent needs).
@@ -30,7 +31,7 @@ import httpx
 
 from .pharmacy import _post_with_retry
 
-OSRM_URL = "https://router.project-osrm.org/route/v1/foot"
+OSRM_URL = "https://routing.openstreetmap.de/routed-foot/route/v1/foot"
 
 
 def _solar_position(lat: float, lon: float, when: datetime) -> tuple[float, float]:
@@ -85,20 +86,32 @@ def _bearing(lat1, lon1, lat2, lon2) -> float:
     return (math.degrees(math.atan2(x, y)) + 360) % 360
 
 
-async def _fetch_buildings(client: httpx.AsyncClient, lat: float, lon: float, radius_m: int = 60) -> list[dict]:
-    query = f"""
-    [out:json][timeout:15];
-    way["building"](around:{radius_m},{lat},{lon});
-    out center 20;
-    """
+SHADE_RADIUS_M = 60
+MAX_SAMPLES_PER_ROUTE = 40
+
+
+def _dist_m(lat1, lon1, lat2, lon2) -> float:
+    """Equirectangular approximation — accurate enough at ~60 m scale."""
+    x = math.radians(lon2 - lon1) * math.cos(math.radians((lat1 + lat2) / 2))
+    y = math.radians(lat2 - lat1)
+    return 6371000 * math.hypot(x, y)
+
+
+async def _fetch_buildings_along(client: httpx.AsyncClient, paths: list[list[tuple[float, float]]]) -> list[dict]:
+    """One Overpass request for buildings near all sampled route points
+    (the `around` filter accepts a whole polyline), instead of one request
+    per point — that was 100+ sequential calls on a long walking route."""
+    parts = []
+    for path in paths:
+        coords = ",".join(f"{lat:.6f},{lon:.6f}" for lat, lon in path)
+        parts.append(f'way["building"](around:{SHADE_RADIUS_M},{coords});')
+    query = f"[out:json][timeout:25];({''.join(parts)});out center;"
     resp = await _post_with_retry(client, {"data": query})
-    data = resp.json()
-    out = []
-    for el in data.get("elements", []):
-        center = el.get("center")
-        if center:
-            out.append({"lat": center["lat"], "lon": center["lon"]})
-    return out
+    return [
+        {"lat": el["center"]["lat"], "lon": el["center"]["lon"]}
+        for el in resp.json().get("elements", [])
+        if el.get("center")
+    ]
 
 
 async def get_shade_route(
@@ -106,7 +119,6 @@ async def get_shade_route(
     origin_lon: float,
     dest_lat: float,
     dest_lon: float,
-    sample_every_n_points: int = 8,
 ) -> dict:
     """Return walking route alternatives ranked by estimated shade coverage."""
     headers = {"User-Agent": "sun-protector-course-project/0.1 (educational)"}
@@ -124,35 +136,36 @@ async def get_shade_route(
         now = datetime.now(timezone.utc)
         sun_az, sun_el = _solar_position(origin_lat, origin_lon, now)
 
-        scored_routes = []
-        for route in osrm_data["routes"][:3]:
+        routes = osrm_data["routes"][:3]
+        samples = []
+        for route in routes:
             coords = route["geometry"]["coordinates"]  # [lon, lat] pairs
-            sampled = coords[::sample_every_n_points] or coords
-            shaded_count = 0
-            checked = 0
+            step = max(1, len(coords) // MAX_SAMPLES_PER_ROUTE)
+            samples.append([(lat, lon) for lon, lat in coords[::step]] or [(lat, lon) for lon, lat in coords])
 
+        buildings = []
+        if sun_el > 0:
+            buildings = await _fetch_buildings_along(client, samples)
+
+        scored_routes = []
+        for route, sampled in zip(routes, samples):
             if sun_el <= 0:
                 # sun below horizon -> treat whole route as "shaded" (no direct UV)
                 shade_fraction = 1.0
             else:
-                for i in range(len(sampled) - 1):
-                    lon1, lat1 = sampled[i]
-                    lon2, lat2 = sampled[i + 1]
-                    walk_bearing = _bearing(lat1, lon1, lat2, lon2)
-                    # the side of the path facing the sun
-                    sun_side_bearing = (walk_bearing + 90) % 360
-                    buildings = await _fetch_buildings(client, lat1, lon1)
-                    checked += 1
-                    is_shaded = False
+                shaded_count = 0
+                for lat1, lon1 in sampled:
+                    # shaded if a building within SHADE_RADIUS_M lies roughly
+                    # towards the sun (within 45° of the solar azimuth)
                     for b in buildings:
+                        if _dist_m(lat1, lon1, b["lat"], b["lon"]) > SHADE_RADIUS_M:
+                            continue
                         b_bearing = _bearing(lat1, lon1, b["lat"], b["lon"])
                         diff = min((b_bearing - sun_az) % 360, (sun_az - b_bearing) % 360)
                         if diff < 45:
-                            is_shaded = True
+                            shaded_count += 1
                             break
-                    if is_shaded:
-                        shaded_count += 1
-                shade_fraction = (shaded_count / checked) if checked else 0.0
+                shade_fraction = shaded_count / len(sampled) if sampled else 0.0
 
             scored_routes.append(
                 {

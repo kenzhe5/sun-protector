@@ -3,19 +3,18 @@
 Flow:
 
     intake -> fetch_uv -> assess_risk --[risk_branch]-->
-        "urgent" -> urgent_advice (human-in-the-loop interrupt) -> plan_route
+        "urgent" -> urgent_advice (срочное «уйдите в тень») -> plan_route
         "normal" -> plan_route
     plan_route -> rag_answer -> compose_response --[recheck_branch]-->
         "recheck" -> recheck_update -> assess_risk   (cycle)
         "end" -> END
 
 This gives the required "multi-step workflow with conditional logic":
-branching (risk_branch), a cycle (recheck loop, capped), and a
-human-in-the-loop confirmation gate (urgent_advice's interrupt()).
+branching (risk_branch) and a cycle (recheck loop, capped). Night is
+handled in assess_risk (is_day from Open-Meteo): no UV → low risk.
 """
 from __future__ import annotations
 
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from . import nodes
@@ -54,8 +53,7 @@ def build_graph():
     )
     graph.add_edge("recheck_update", "assess_risk")
 
-    checkpointer = MemorySaver()
-    return graph.compile(checkpointer=checkpointer)
+    return graph.compile()
 
 
 _compiled = None

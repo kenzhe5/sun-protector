@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 
 from langchain_core.messages import HumanMessage
 
@@ -23,7 +24,7 @@ III: light-medium, sometimes mild burn, tans gradually. IV: medium/olive, rarely
 V: brown, very rarely burns, tans darkly. VI: deeply pigmented, never burns.
 
 Look at the skin tone in the image and respond with ONLY a JSON object:
-{"phototype": <1-6 integer>, "confidence": <0-1 float>, "note": "<one short sentence>"}
+{"phototype": <1-6 integer, arabic digit, not roman>, "confidence": <0-1 float>, "note": "<one short sentence in Russian>"}
 """
 
 
@@ -42,8 +43,23 @@ async def analyze_skin_photo(image_bytes: bytes, media_type: str = "image/jpeg")
     )
     result, _model = await config.call_with_fallback([message], temperature=0.0, max_tokens=200)
     text = result.content if isinstance(result.content, str) else str(result.content)
-    text = text.strip().strip("```json").strip("```").strip()
+    return _parse(text)
+
+
+ROMAN = {"VI": 6, "IV": 4, "V": 5, "III": 3, "II": 2, "I": 1}
+
+
+def _parse(text: str) -> dict:
+    """Модель иногда пишет тип римскими цифрами (`"phototype": III`) или
+    оборачивает JSON в ```-блок — такой ответ всё равно разбираем."""
+    body = re.search(r"\{.*\}", text, re.S)
+    body = body.group(0) if body else text
+    body = re.sub(r'("phototype"\s*:\s*)"?(VI|IV|V|III|II|I)"?', lambda m: m.group(1) + str(ROMAN[m.group(2)]), body)
     try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return {"phototype": 3, "confidence": 0.0, "note": "parse_failed", "raw": text}
+        data = json.loads(body)
+        data["phototype"] = int(data["phototype"])
+        if 1 <= data["phototype"] <= 6:
+            return data
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        pass
+    return {"phototype": None, "confidence": 0.0, "note": "Не удалось распознать ответ модели", "raw": text}

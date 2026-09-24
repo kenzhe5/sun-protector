@@ -2,101 +2,395 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Sun Protector</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="style.css?v=2" />
+<!-- Весь фронтенд — один файл: браузер не может смешать старые и новые скрипты из кэша. -->
+<style>
+:root {
+  --sun: #f5a623;
+  --sun-soft: #fff4dc;
+  --shade: #2c5f6f;
+  --bg: #f6f3ec;
+  --panel: #ffffff;
+  --text: #1e2a2f;
+  --muted: #6b7478;
+  --border: #e6dfd0;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text); font-size: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; max-width: 760px; margin: 0 auto; }
+
+header {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  border-bottom: 1px solid var(--border); background: var(--bg);
+}
+.logo { font-weight: 700; font-size: 18px; }
+.sun-status { margin-left: auto; font-size: 13px; padding: 5px 11px; border-radius: 999px; background: var(--sun-soft); white-space: nowrap; }
+.sun-status.night { background: #e3e8f4; color: #28324a; }
+.icon-btn { background: none; border: none; font-size: 18px; padding: 6px; border-radius: 8px; cursor: pointer; line-height: 1; }
+.icon-btn:hover { background: var(--sun-soft); }
+
+.messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.msg { max-width: 85%; padding: 10px 14px; border-radius: 18px; line-height: 1.45; word-wrap: break-word; }
+.msg .text { white-space: pre-wrap; }
+.msg.bot { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 5px; }
+.msg.user { align-self: flex-end; background: var(--shade); color: #fff; border-bottom-right-radius: 5px; }
+.msg.error { background: #fff5f4; border-color: #f1b8b3; }
+.msg.wide { max-width: 100%; width: 100%; }
+.msg img.preview { display: block; max-width: 200px; border-radius: 12px; }
+
+.typing span { display: inline-block; width: 7px; height: 7px; margin: 0 2px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite both; }
+.typing span:nth-child(2) { animation-delay: .2s; }
+.typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.actions button, .chips button {
+  cursor: pointer; font: inherit; font-size: 13px; color: var(--text);
+  border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 7px 12px; white-space: nowrap;
+}
+.actions button { background: var(--sun-soft); border-color: var(--sun); }
+.actions button:hover, .chips button:hover { background: var(--sun-soft); border-color: var(--sun); }
+
+.route-map { height: 240px; border-radius: 12px; margin-top: 10px; border: 1px solid var(--border); }
+.route-card {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; margin-top: 6px; background: #fff;
+}
+.route-card.selected { border-color: var(--shade); box-shadow: inset 0 0 0 1px var(--shade); }
+.route-card b { display: block; }
+.route-card small { color: var(--muted); }
+.shade-bar { width: 60px; height: 8px; border-radius: 4px; background: #f1e3c4; overflow: hidden; flex-shrink: 0; }
+.shade-bar i { display: block; height: 100%; background: var(--shade); }
+
+.composer { padding: 8px 16px 12px; border-top: 1px solid var(--border); background: var(--bg); }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chips button { flex-shrink: 0; }
+form { display: flex; align-items: center; gap: 6px; }
+#input {
+  flex: 1; min-width: 0; padding: 12px 16px; border: 1px solid var(--border); border-radius: 999px;
+  font: inherit; font-size: 15px; background: #fff;
+}
+#input:focus { outline: 2px solid var(--sun); border-color: var(--sun); }
+.send {
+  width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0;
+  background: var(--sun); color: #2a1c00; font-size: 18px;
+}
+.send:disabled { opacity: .5; cursor: wait; }
+.hidden-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+.disclaimer { margin: 6px 0 0; font-size: 11px; color: var(--muted); text-align: center; }
+</style>
 </head>
 <body>
-<header>
-  <h1>☀️ Sun Protector</h1>
-  <p>ИИ-ассистент по защите от солнца: риск UV, маршрут в тени, напоминания про SPF</p>
-</header>
+<div class="app">
+  <header>
+    <div class="logo">☀️ Sun Protector</div>
+    <div class="sun-status" id="sunStatus">…</div>
+    <button class="icon-btn" id="newChat" title="Новый чат">🗑️</button>
+  </header>
 
-<main>
-  <section class="panel">
-    <h2>Профиль</h2>
-    <label>Фототип кожи (Fitzpatrick)
-      <select id="phototype">
-        <option value="1">I — очень светлая, всегда обгорает</option>
-        <option value="2" selected>II — светлая, легко обгорает</option>
-        <option value="3">III — светло-смуглая</option>
-        <option value="4">IV — смуглая, редко обгорает</option>
-        <option value="5">V — тёмная</option>
-        <option value="6">VI — очень тёмная</option>
-      </select>
-    </label>
+  <div class="messages" id="messages"></div>
 
-    <div class="row">
-      <label>📷 Фото кожи
-        <input type="file" id="skinPhoto" accept="image/*" />
-      </label>
-      <button id="analyzeSkinBtn" type="button">Определить фототип по фото</button>
+  <div class="composer">
+    <div class="chips" id="chips">
+      <button type="button" data-say="Можно сейчас выйти на улицу?">☀️ Можно выйти?</button>
+      <button type="button" data-say="Проложи путь на работу">💼 На работу</button>
+      <button type="button" data-say="Проложи путь домой">🏠 Домой</button>
+      <button type="button" data-say="Какой солнцезащитный крем мне нужен?">🧴 Какой крем?</button>
+      <button type="button" data-photo>📷 Проверить фото</button>
     </div>
-    <div id="skinResult" class="hint"></div>
-
-    <label>Минут уже на улице
-      <input type="number" id="minutesOutside" value="30" min="0" />
-    </label>
-
-    <label>
-      <input type="checkbox" id="noSpfYet" />
-      Крем ещё не наносил(а)
-    </label>
-    <label id="spfMinutesRow">Крем нанесён (мин назад)
-      <input type="number" id="minutesSinceSpf" value="60" min="0" />
-    </label>
-
-    <label>
-      <input type="checkbox" id="sweating" />
-      Потею / купаюсь
-    </label>
-
-    <div class="row">
-      <label>📷 Фото этикетки крема
-        <input type="file" id="labelPhoto" accept="image/*" />
-      </label>
-      <button id="analyzeLabelBtn" type="button">Проверить крем</button>
-    </div>
-    <div id="labelResult" class="hint"></div>
-
-    <label>Свободный вопрос (опционально)
-      <textarea id="question" rows="2" placeholder="Например: как часто наносить крем при плавании?"></textarea>
-    </label>
-
-    <button id="recommendBtn" type="button" class="primary">Получить рекомендацию</button>
-    <div class="hint">Клик по карте: 1-й клик — точка старта, 2-й клик — точка назначения (маршрут в тени, опционально)</div>
-  </section>
-
-  <section class="panel map-panel">
-    <div id="map"></div>
-  </section>
-
-  <section class="panel">
-    <h2>Результат</h2>
-    <div id="result">Заполните профиль и нажмите «Получить рекомендацию».</div>
-    <details id="traceDetails">
-      <summary>Ход выполнения workflow (LangGraph trace)</summary>
-      <ol id="traceList"></ol>
-    </details>
-    <details id="sourcesDetails">
-      <summary>Источники (RAG)</summary>
-      <ul id="sourcesList"></ul>
-    </details>
-  </section>
-</main>
-
-<div id="confirmModal" class="modal hidden">
-  <div class="modal-box">
-    <p id="confirmMessage"></p>
-    <div class="row">
-      <button id="confirmYes" class="primary">Да, отправить</button>
-      <button id="confirmNo">Нет</button>
-    </div>
+    <form id="form">
+      <button type="button" class="icon-btn" id="attach" title="Прикрепить фото">📎</button>
+      <input type="file" id="photo" accept="image/*" class="hidden-input" />
+      <input id="input" type="text" placeholder="Напишите сообщение…" autocomplete="off" />
+      <button type="submit" class="send" id="send" title="Отправить">➤</button>
+    </form>
+    <p class="disclaimer">Не медицинский совет · Open-Meteo, OpenStreetMap, WHO/AAD/EPA</p>
   </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="app.js?v=2"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const messagesEl = $("messages");
+
+// ---------- Память браузера: переписка, профиль, дом/работа ----------
+const store = {
+  get(k, d = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let history = store.get("sp_history", []);               // [{role, text}]
+const places = store.get("sp_places", { home: null, work: null });
+const profile = store.get("sp_profile", { phototype: null, spfAppliedAt: null, sweating: false });
+let myLocation = null;
+let busy = false;
+
+function remember(role, text) {
+  history.push({ role, text });
+  history = history.slice(-40);
+  store.set("sp_history", history);
+}
+function minutesSinceSpf() {
+  return profile.spfAppliedAt ? Math.round((Date.now() - profile.spfAppliedAt) / 60000) : null;
+}
+
+// ---------- Вывод сообщений ----------
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function fmt(text) {
+  return esc(text).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n{3,}/g, "\n\n").trim();
+}
+function scrollDown() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+function bubble(role, html, cls = "") {
+  const el = document.createElement("div");
+  el.className = `msg ${role} ${cls}`.trim();
+  el.innerHTML = html;
+  messagesEl.appendChild(el);
+  scrollDown();
+  return el;
+}
+function botSay(text, { save = true, actions = null } = {}) {
+  const el = bubble("bot", `<div class="text">${fmt(text)}</div>`);
+  if (actions) addActions(el, actions);
+  if (save) remember("assistant", text);
+  return el;
+}
+function addActions(el, actions) {
+  const box = document.createElement("div");
+  box.className = "actions";
+  actions.forEach(([label, fn]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.onclick = () => { box.remove(); fn(); };
+    box.appendChild(b);
+  });
+  el.appendChild(box);
+  scrollDown();
+}
+function typing() {
+  return bubble("bot", `<span class="typing"><span></span><span></span><span></span></span>`);
+}
+
+// ---------- Маршрут: мини-карта прямо в сообщении ----------
+function renderRoute(el, routes, points, isDay) {
+  el.classList.add("wide");
+  const mapDiv = document.createElement("div");
+  mapDiv.className = "route-map";
+  el.appendChild(mapDiv);
+
+  const map = L.map(mapDiv, { zoomControl: false, attributionControl: false, scrollWheelZoom: false });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+  const layers = L.layerGroup().addTo(map);
+  const dot = (p, color) => L.circleMarker([p.lat, p.lon], { radius: 7, color: "#fff", weight: 3, fillColor: color, fillOpacity: 1 });
+
+  const cards = routes.map((r, i) => {
+    const shade = Math.round(r.shade_fraction * 100);
+    const sub = isDay ? `в тени ~${shade}% пути${i === 0 ? " · больше всего тени" : ""}` : "ночью тень не важна";
+    const card = document.createElement("div");
+    card.className = "route-card";
+    card.innerHTML = `<div><b>${Math.round(r.duration_min)} мин · ${(r.distance_m / 1000).toFixed(1)} км</b><small>${sub}</small></div>` +
+      (isDay ? `<div class="shade-bar"><i style="width:${shade}%"></i></div>` : "");
+    card.onclick = () => select(i);
+    el.appendChild(card);
+    return card;
+  });
+
+  function select(sel) {
+    layers.clearLayers();
+    routes.forEach((r, i) => {
+      if (i === sel) return;
+      L.polyline(r.geometry.coordinates.map((c) => [c[1], c[0]]), { color: "#8a9599", weight: 4, opacity: .6 })
+        .on("click", () => select(i)).addTo(layers);
+    });
+    const coords = routes[sel].geometry.coordinates.map((c) => [c[1], c[0]]);
+    L.polyline(coords, { color: "#fff", weight: 9 }).addTo(layers);
+    L.polyline(coords, { color: "#2c5f6f", weight: 5 }).addTo(layers);
+    if (points?.origin) dot(points.origin, "#2e9d5b").bindTooltip(points.origin.label || "Старт").addTo(layers);
+    if (points?.destination) dot(points.destination, "#e0473c").bindTooltip(points.destination.label || "Финиш").addTo(layers);
+    map.fitBounds(L.latLngBounds(coords), { padding: [20, 20] });
+    cards.forEach((c, j) => c.classList.toggle("selected", j === sel));
+  }
+  select(0);
+  scrollDown();
+}
+
+// ---------- Отправка в чат ----------
+async function send(text) {
+  text = text.trim();
+  if (!text || busy) return;
+  busy = true;
+  $("send").disabled = true;
+  bubble("user", `<div class="text">${esc(text)}</div>`);
+  remember("user", text);
+  const t = typing();
+  try {
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: history,
+        location: myLocation,
+        places,
+        phototype: profile.phototype,
+        minutes_since_last_spf: minutesSinceSpf(),
+        sweating_or_swimming: profile.sweating,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    t.remove();
+    if (!res.ok) throw new Error(data.detail || `ошибка сервера ${res.status}`);
+
+    // что бот запомнил из переписки
+    for (const [k, p] of Object.entries(data.places_update || {})) places[k] = p;
+    store.set("sp_places", places);
+    const pu = data.profile_update || {};
+    if ("phototype" in pu) profile.phototype = pu.phototype;
+    if ("sunscreen_applied_minutes_ago" in pu)
+      profile.spfAppliedAt = pu.sunscreen_applied_minutes_ago == null ? null : Date.now() - pu.sunscreen_applied_minutes_ago * 60000;
+    if ("sweating_or_swimming" in pu) profile.sweating = pu.sweating_or_swimming;
+    store.set("sp_profile", profile);
+    if (data.sun) showSun(data.sun);
+
+    const el = botSay(data.text || "…");
+    if (data.routes?.length) renderRoute(el, data.routes, data.route_points, data.sun?.is_day !== false);
+  } catch (err) {
+    t.remove();
+    bubble("bot", `<div class="text">Не получилось ответить: ${esc(err.message)}. Попробуйте ещё раз.</div>`, "error");
+  } finally {
+    busy = false;
+    $("send").disabled = false;
+  }
+}
+
+$("form").onsubmit = (e) => {
+  e.preventDefault();
+  const text = $("input").value;
+  $("input").value = "";
+  send(text);
+};
+$("chips").onclick = (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.photo !== undefined) return $("photo").click();
+  send(b.dataset.say);
+};
+
+// ---------- Фото: тип кожи / этикетка крема ----------
+// Фото с телефона бывают по 5–10 МБ и в HEIC — уменьшаем и пересохраняем в JPEG.
+async function toJpeg(file, maxSide = 1600) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * k);
+  c.height = Math.round(bmp.height * k);
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise((ok, fail) => c.toBlob((b) => (b ? ok(b) : fail(new Error("не удалось открыть фото"))), "image/jpeg", 0.85));
+}
+
+$("attach").onclick = () => $("photo").click();
+$("photo").onchange = async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  let jpeg;
+  try { jpeg = await toJpeg(file); }
+  catch { return botSay("Не получилось открыть это фото. Сохраните его как JPG или PNG и попробуйте снова.", { save: false }); }
+  bubble("user", `<img class="preview" src="${URL.createObjectURL(jpeg)}" alt="фото">`);
+  botSay("Что проверить на фото?", {
+    save: false,
+    actions: [["🖐 Тип кожи", () => analyzePhoto(jpeg, "skin")], ["🧴 Этикетку крема", () => analyzePhoto(jpeg, "label")]],
+  });
+};
+
+async function analyzePhoto(jpeg, kind) {
+  const t = typing();
+  const fd = new FormData();
+  fd.append("file", jpeg, "photo.jpg");
+  try {
+    const res = await fetch(kind === "skin" ? "/api/analyze-skin" : "/api/analyze-label", { method: "POST", body: fd });
+    const d = await res.json().catch(() => ({}));
+    t.remove();
+    if (!res.ok) throw new Error(d.detail || `ошибка сервера ${res.status}`);
+    if (kind === "skin") {
+      if (!d.phototype) return botSay("Не получилось определить тип кожи. Попробуйте фото крупнее, при дневном свете.");
+      profile.phototype = d.phototype;
+      store.set("sp_profile", profile);
+      const roman = ["", "I", "II", "III", "IV", "V", "VI"][d.phototype];
+      botSay(`Похоже на тип кожи ${roman} (уверенность ${Math.round((d.confidence || 0) * 100)}%). ${d.note || ""}\nЗапомнил — буду учитывать в советах.`);
+    } else {
+      if (!d.spf) return botSay("Не нашёл SPF на этикетке. Сфотографируйте лицевую сторону тюбика крупнее, без бликов.");
+      const broad = d.broad_spectrum == null ? "" : d.broad_spectrum ? " Защищает и от UVA, и от UVB." : " Защита от UVA не указана.";
+      const exp = d.expiry_date ? ` Срок годности: ${d.expiry_date}.` : "";
+      botSay(`SPF ${d.spf} — ${d.spf >= 30 ? "подходит ✅ (рекомендуют SPF 30+)" : "маловато ⚠️, рекомендуют SPF 30+"}.${broad}${exp}`);
+    }
+  } catch (err) {
+    t.remove();
+    bubble("bot", `<div class="text">Не получилось проверить фото: ${esc(err.message)}</div>`, "error");
+  }
+}
+
+// ---------- День / ночь в шапке ----------
+const RISK = { low: "низкий риск", moderate: "умеренный риск", high: "высокий риск", very_high: "очень высокий риск", extreme: "экстремальный риск" };
+function showSun(s) {
+  const el = $("sunStatus");
+  if (s.is_day === false) {
+    el.className = "sun-status night";
+    el.textContent = `🌙 Ночь · восход в ${(s.sunrise || "").slice(11, 16)}`;
+  } else {
+    el.className = "sun-status";
+    el.textContent = `☀️ UV ${s.uv_index ?? "?"} · ${RISK[s.risk_band] || ""}`;
+  }
+}
+async function loadSun(lat, lon) {
+  try { showSun(await (await fetch(`/api/sun?lat=${lat}&lon=${lon}`)).json()); }
+  catch { $("sunStatus").textContent = "UV: нет данных"; }
+}
+
+// ---------- Старт ----------
+function greet() {
+  botSay(
+    "Привет! Я Sun Protector ☀️ Помогу не сгореть и дойти по тени.\n\n" +
+    "Пишите как в мессенджере: «можно выйти?», «проложи путь до Абая 150», «какой крем взять на пляж?». " +
+    "Расскажите, какая у вас кожа и где дом с работой — запомню.",
+    {
+      save: false,
+      actions: [
+        ["☀️ Можно выйти?", () => send("Можно сейчас выйти на улицу?")],
+        ["🚶 Проложить путь", () => { $("input").value = "Проложи путь до "; $("input").focus(); }],
+        ["📷 Проверить фото", () => $("photo").click()],
+      ],
+    }
+  );
+}
+
+$("newChat").onclick = () => {
+  history = [];
+  store.set("sp_history", history);
+  messagesEl.innerHTML = "";
+  greet();
+};
+
+if (history.length) history.forEach((m) => (m.role === "user" ? bubble("user", `<div class="text">${esc(m.text)}</div>`) : botSay(m.text, { save: false })));
+else greet();
+
+loadSun(43.2389, 76.8897); // Алматы, пока нет геолокации
+navigator.geolocation?.getCurrentPosition(
+  (pos) => {
+    myLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    loadSun(myLocation.lat, myLocation.lon);
+  },
+  () => {}, // без геолокации бот спросит адрес
+  { timeout: 8000 }
+);
+</script>
 </body>
 </html>

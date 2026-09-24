@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 
 from langchain_core.messages import HumanMessage
 
@@ -37,8 +38,8 @@ async def analyze_label_photo(image_bytes: bytes, media_type: str = "image/jpeg"
     )
     result, _model = await config.call_with_fallback([message], temperature=0.0, max_tokens=400)
     text = result.content if isinstance(result.content, str) else str(result.content)
-    text = text.strip().strip("```json").strip("```").strip()
+    body = re.search(r"\{.*\}", text, re.S)
     try:
-        return json.loads(text)
+        return json.loads(body.group(0) if body else text)
     except json.JSONDecodeError:
         return {"spf": None, "raw_text_snippet": text, "note": "parse_failed"}

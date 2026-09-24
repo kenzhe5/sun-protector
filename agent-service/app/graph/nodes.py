@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langgraph.types import interrupt
 
 from .. import config, mcp_client
 from ..guardrails import check_output
@@ -46,7 +45,16 @@ async def assess_risk_node(state: SunProtectorState) -> dict:
         minutes_since_last_spf=state.get("minutes_since_last_spf"),
         sweating_or_swimming=state.get("sweating_or_swimming", False),
     )
-    risk_dict = result.__dict__
+    risk_dict = dict(result.__dict__)
+    if not state["uv_data"].get("is_day", True):
+        # Ночь: UV нет — крем обновлять не нужно, даже если он нанесён давно.
+        risk_dict.update(
+            risk_band="low",
+            reapply_due=False,
+            minutes_until_reapply=-1,
+            recommendation_summary="Сейчас ночь — ультрафиолета нет, солнцезащитный крем не нужен. Можно спокойно выходить.",
+        )
+        return {"risk": risk_dict, "trace": _trace(state, "assess_risk: night (is_day=0), UV-риска нет")}
     return {"risk": risk_dict, "trace": _trace(state, f"assess_risk: band={result.risk_band} ratio={result.risk_ratio}")}
 
 
@@ -56,29 +64,13 @@ def risk_branch(state: SunProtectorState) -> str:
 
 
 async def urgent_advice(state: SunProtectorState) -> dict:
-    """High/extreme risk: ask for human confirmation before 'sending' the
-    urgent push notification (human-in-the-loop gate required by the
-    course spec). The frontend surfaces this as a confirm dialog and
-    resumes the graph via /api/resume.
-    """
+    """Очень высокий/экстремальный риск: добавляем срочное предупреждение
+    («уйдите в тень сейчас»), которое compose_response ставит первым."""
     risk = state["risk"]
-    message = (
-        f"⚠️ UV-риск: {risk['risk_band']} (UV index {risk['uv_index']}). "
-        f"{risk['recommendation_summary']} Отправить срочное push-уведомление сейчас?"
-    )
-    answer = interrupt(
-        {
-            "type": "confirm_urgent_notification",
-            "message": message,
-            "risk": risk,
-        }
-    )
-    confirmed = bool(answer) if answer is not None else False
+    message = f"⚠️ {risk['recommendation_summary']} (UV {risk['uv_index']})"
     return {
-        "confirmed": confirmed,
         "urgent_message": message,
-        "needs_confirmation": False,
-        "trace": _trace(state, f"urgent_advice: human confirmed={confirmed}"),
+        "trace": _trace(state, f"urgent_advice: {risk['risk_band']}"),
     }
 
 
@@ -123,10 +115,17 @@ SYSTEM_PROMPT = """Ты — Sun Protector, ассистент по безопа�
 3. Если есть маршрут — какой выбрать и почему (тень vs расстояние).
 4. Если есть цитаты из гайдлайнов — кратко используй их для обоснования.
 
-Пиши по-человечески, 4-8 предложений, без воды."""
+Если сейчас НОЧЬ: скажи прямо, что ультрафиолета нет и выходить безопасно,
+крем и тень не нужны (маршрут — просто самый удобный). Можно одной фразой
+подсказать про завтра: во сколько восход и какой будет максимум UV.
+
+Пиши по-человечески, 3-6 предложений, без воды и без нумерованных пунктов."""
 
 
 async def compose_response(state: SunProtectorState) -> dict:
+    if state.get("skip_summary"):
+        # Чат сам пишет ответ по данным графа — второй вызов LLM тут лишний.
+        return {"trace": _trace(state, "compose_response: skipped (chat mode)")}
     risk = state.get("risk", {})
     uv = state.get("uv_data", {})
     routes = state.get("route_options", [])
@@ -134,6 +133,9 @@ async def compose_response(state: SunProtectorState) -> dict:
     question = state.get("question")
 
     context_parts = [
+        f"Местное время: {uv.get('local_time')}, сейчас {'день' if uv.get('is_day', True) else 'НОЧЬ (солнце село)'}; "
+        f"восход {uv.get('sunrise')}, закат {uv.get('sunset')}, следующий восход {uv.get('next_sunrise')}, "
+        f"максимум UV за день {uv.get('daily_uv_max')}",
         f"UV сейчас: {uv.get('current_uv_index')} ({uv.get('current_risk_band')})",
         f"Риск: {risk.get('risk_band')} (ratio={risk.get('risk_ratio')}), safe_exposure_minutes={risk.get('safe_exposure_minutes')}",
         f"Повторное нанесение нужно: {risk.get('reapply_due')}, через {risk.get('minutes_until_reapply')} мин",
@@ -143,8 +145,8 @@ async def compose_response(state: SunProtectorState) -> dict:
         context_parts.append(
             f"Лучший маршрут: {best['distance_m']}м, {best['duration_min']}мин, доля тени={best['shade_fraction']*100:.0f}%"
         )
-    if state.get("confirmed") is not None:
-        context_parts.append(f"Пользователь подтвердил срочное уведомление: {state['confirmed']}")
+    if state.get("urgent_message"):
+        context_parts.append(f"СРОЧНО (скажи первым): {state['urgent_message']}")
     if rag_sources:
         cites = "\n".join(f"- ({s['source']}) {s['text']}" for s in rag_sources)
         context_parts.append(f"Релевантные фрагменты гайдлайнов:\n{cites}")
@@ -167,6 +169,8 @@ def recheck_branch(state: SunProtectorState) -> str:
     routes = state.get("route_options") or []
     if not routes or state.get("recheck_count", 0) >= MAX_RECHECKS:
         return "end"
+    if not state.get("uv_data", {}).get("is_day", True):
+        return "end"  # ночью за время прогулки риск не вырастет
     best = routes[0]
     projected_minutes_outside = state.get("minutes_outside", 0) + best.get("duration_min", 0)
     reapply_interval = 60 if state.get("sweating_or_swimming") else 120

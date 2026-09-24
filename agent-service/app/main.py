@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import logging
-import uuid
+from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from langchain_core.messages import HumanMessage, SystemMessage
-from langgraph.types import Command
 from pydantic import BaseModel
 
-from . import config
+from . import config, geo, mcp_client
+from .chat import ChatContext, run_chat
 from .graph.graph import get_graph
 from .guardrails import check_input, check_output
 from .multimodal.label_ocr import analyze_label_photo
@@ -45,9 +45,27 @@ class RecommendRequest(BaseModel):
     question: str | None = None
 
 
-class ResumeRequest(BaseModel):
-    thread_id: str
-    confirmed: bool
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str
+
+
+class Place(BaseModel):
+    lat: float
+    lon: float
+    label: str = ""
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage]
+    location: LatLon | None = None
+    map_point: Place | None = None
+    places: dict[str, Place | None] = {}
+    phototype: int | None = None
+    minutes_since_last_spf: int | None = None
+    sweating_or_swimming: bool = False
+    route_from: Place | None = None  # точки из формы «Откуда/Куда»
+    route_to: Place | None = None
 
 
 class AskRequest(BaseModel):
@@ -59,17 +77,9 @@ async def health():
     return {"status": "ok"}
 
 
-def _format_result(state: dict, thread_id: str) -> dict:
-    if "__interrupt__" in state and state["__interrupt__"]:
-        interrupt = state["__interrupt__"][0]
-        return {
-            "status": "needs_confirmation",
-            "thread_id": thread_id,
-            "interrupt": interrupt.value,
-        }
+def _format_result(state: dict) -> dict:
     return {
         "status": "done",
-        "thread_id": thread_id,
         "risk": state.get("risk"),
         "uv_data": state.get("uv_data"),
         "route_options": state.get("route_options"),
@@ -88,7 +98,6 @@ async def recommend(req: RecommendRequest):
             raise HTTPException(400, "Input blocked by guardrails (possible prompt injection).")
         req.question = guarded.text
 
-    thread_id = str(uuid.uuid4())
     graph = get_graph()
     graph_input = {
         "phototype": req.phototype,
@@ -99,31 +108,56 @@ async def recommend(req: RecommendRequest):
         "sweating_or_swimming": req.sweating_or_swimming,
         "question": req.question,
     }
-    state = await graph.ainvoke(graph_input, config={"configurable": {"thread_id": thread_id}})
-    return _format_result(state, thread_id)
+    state = await graph.ainvoke(graph_input)
+    return _format_result(state)
 
 
-@app.post("/api/resume")
-async def resume(req: ResumeRequest):
-    graph = get_graph()
-    state = await graph.ainvoke(
-        Command(resume=req.confirmed), config={"configurable": {"thread_id": req.thread_id}}
+@app.post("/api/chat")
+async def chat(req: ChatRequest):
+    if not req.messages or req.messages[-1].role != "user":
+        raise HTTPException(400, "Последнее сообщение должно быть от пользователя.")
+    guarded = check_input(req.messages[-1].text)
+    if not guarded.allowed:
+        return {"text": "Не могу выполнить такую просьбу. Спросите про солнце, крем или маршрут 🙂", "routes": []}
+    history = [m.model_dump() for m in req.messages]
+    history[-1]["text"] = guarded.text
+
+    ctx = ChatContext(
+        location=req.location.model_dump() if req.location else None,
+        map_point=req.map_point.model_dump() if req.map_point else None,
+        places={k: v.model_dump() if v else None for k, v in req.places.items()},
+        phototype=req.phototype,
+        minutes_since_last_spf=req.minutes_since_last_spf,
+        sweating=req.sweating_or_swimming,
     )
-    return _format_result(state, req.thread_id)
+    try:
+        route = (req.route_from.model_dump(), req.route_to.model_dump()) if req.route_from and req.route_to else None
+        result = await run_chat(history, ctx, route)
+    except Exception:
+        logging.exception("chat failed")
+        raise HTTPException(502, "Модель сейчас недоступна, попробуйте ещё раз.")
+    result["text"] = check_output(result["text"], add_disclaimer=False).text
+    return result
 
 
 @app.post("/api/analyze-skin")
 async def analyze_skin(file: UploadFile = File(...)):
     data = await file.read()
-    result = await analyze_skin_photo(data, file.content_type or "image/jpeg")
-    return result
+    try:
+        return await analyze_skin_photo(data, file.content_type or "image/jpeg")
+    except Exception as exc:
+        logging.exception("analyze_skin failed")
+        raise HTTPException(502, f"Модель не смогла обработать фото: {exc.__class__.__name__}")
 
 
 @app.post("/api/analyze-label")
 async def analyze_label(file: UploadFile = File(...)):
     data = await file.read()
-    result = await analyze_label_photo(data, file.content_type or "image/jpeg")
-    return result
+    try:
+        return await analyze_label_photo(data, file.content_type or "image/jpeg")
+    except Exception as exc:
+        logging.exception("analyze_label failed")
+        raise HTTPException(502, f"Модель не смогла обработать фото: {exc.__class__.__name__}")
 
 
 ASK_SYSTEM_PROMPT = (
@@ -152,6 +186,41 @@ async def ask(req: AskRequest):
         "sources": [{"source": d.metadata.get("source"), "excerpt": d.page_content[:200]} for d in docs],
         "model_used": model_used,
     }
+
+
+@app.get("/api/sun")
+async def sun(lat: float, lon: float):
+    """День/ночь и UV прямо сейчас — для строки статуса, без вызова LLM."""
+    uv = await mcp_client.call_tool("get_uv_forecast_tool", latitude=lat, longitude=lon)
+    return {
+        "is_day": uv.get("is_day", True),
+        "uv_index": uv.get("current_uv_index"),
+        "risk_band": uv.get("current_risk_band"),
+        "sunrise": uv.get("next_sunrise") or uv.get("sunrise"),
+        "sunset": uv.get("sunset"),
+        "daily_uv_max": uv.get("daily_uv_max"),
+    }
+
+
+@app.get("/api/geocode")
+async def geocode(q: str, lat: float | None = None, lon: float | None = None):
+    return await geo.geocode(q, lat, lon)
+
+
+@app.get("/api/reverse")
+async def reverse(lat: float, lon: float):
+    return {"label": await geo.reverse_label(lat, lon)}
+
+
+@app.middleware("http")
+async def no_cache_frontend(request, call_next):
+    """Без Cache-Control браузер кэширует index.html/app.js «на глазок» и после
+    обновления показывает старый фронтенд. no-cache = всегда сверяться с сервером
+    (по ETag — если файл не менялся, ответ 304 без повторной загрузки)."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
 
 
 app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")

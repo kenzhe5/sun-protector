@@ -17,6 +17,7 @@ class SunProtectorState(TypedDict, total=False):
     minutes_since_last_spf: Optional[int]
     sweating_or_swimming: bool
     question: Optional[str]  # free-form question routed through RAG
+    skip_summary: bool  # чат-режим: не вызывать LLM в compose_response
 
     # --- derived / working memory ---
     uv_data: dict[str, Any]
@@ -25,10 +26,8 @@ class SunProtectorState(TypedDict, total=False):
     rag_answer: Optional[str]
     rag_sources: list[dict[str, Any]]
 
-    # --- human-in-the-loop ---
-    needs_confirmation: bool
+    # --- urgent branch ---
     urgent_message: Optional[str]
-    confirmed: Optional[bool]
 
     # --- loop control ---
     recheck_count: int

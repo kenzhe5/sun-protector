@@ -10,3 +10,4 @@ out/
 agent-service/data/chroma/
 *.log
 .DS_Store
+.playwright-mcp/

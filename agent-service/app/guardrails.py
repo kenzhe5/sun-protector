@@ -69,7 +69,7 @@ def check_output(text: str, *, add_disclaimer: bool = True) -> GuardrailResult:
         if pattern.search(text):
             flags.append(f"blocked_diagnosis_claim:{pattern.pattern[:30]}")
             safe_text = pattern.sub(
-                "this may need a dermatologist's evaluation (I can't diagnose)", safe_text
+                "это стоит показать дерматологу (я не ставлю диагнозы)", safe_text
             )
 
     if add_disclaimer and DISCLAIMER.strip() not in safe_text:
