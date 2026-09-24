@@ -41,7 +41,12 @@ FAST_MODEL = os.getenv("FAST_MODEL", "claude-haiku-4-5-20251001")
 FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-4o-mini")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
-DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "0.2"))
+# temperature=0: по эксперименту evals/hyperparams.py качество как при 0.2
+# (судья 4.17 vs 4.20 — в пределах шума), а стабильность ответов выше
+# (0.79 vs 0.60). Для советов по безопасности важнее одинаковый ответ на
+# одинаковый вопрос. top_p не трогаем (1.0): провайдеры советуют настраивать
+# что-то одно — temperature или top_p. Подробности — EVALS.md.
+DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "0.0"))
 DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "1024"))
 
 CHROMA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "chroma")

@@ -193,12 +193,15 @@ function renderRoute(el, routes, points, isDay) {
   const dot = (p, color) => L.circleMarker([p.lat, p.lon], { radius: 7, color: "#fff", weight: 3, fillColor: color, fillOpacity: 1 });
 
   const cards = routes.map((r, i) => {
-    const shade = Math.round(r.shade_fraction * 100);
-    const sub = isDay ? `в тени ~${shade}% пути${i === 0 ? " · больше всего тени" : ""}` : "ночью тень не важна";
+    const known = r.shade_fraction != null;
+    const shade = Math.round((r.shade_fraction || 0) * 100);
+    const sub = !isDay ? "ночью тень не важна"
+      : !known ? "тень сейчас не посчиталась — сервис карт не ответил"
+      : `в тени ~${shade}% пути${i === 0 ? " · больше всего тени" : ""}`;
     const card = document.createElement("div");
     card.className = "route-card";
     card.innerHTML = `<div><b>${Math.round(r.duration_min)} мин · ${(r.distance_m / 1000).toFixed(1)} км</b><small>${sub}</small></div>` +
-      (isDay ? `<div class="shade-bar"><i style="width:${shade}%"></i></div>` : "");
+      (isDay && known ? `<div class="shade-bar"><i style="width:${shade}%"></i></div>` : "");
     card.onclick = () => select(i);
     el.appendChild(card);
     return card;

@@ -136,7 +136,11 @@ async def _plan(ctx: ChatContext, o: dict, d: dict) -> str:
             "минут": r["duration_min"],
             "км": round(r["distance_m"] / 1000, 1),
             # ночью солнца нет — доля тени бессмысленна, не даём модели её упоминать
-            "доля_тени": r["shade_fraction"] if is_day else "ночь, тень не важна",
+            "доля_тени": (
+                "ночь, тень не важна" if not is_day
+                else "не удалось посчитать (сервис карт не ответил)" if r["shade_fraction"] is None
+                else r["shade_fraction"]
+            ),
         }
         for r in routes
     ] or "пеший маршрут не найден"

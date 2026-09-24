@@ -9,7 +9,8 @@
 исходное задание). Полное техническое обоснование — в [ARCHITECTURE.md](ARCHITECTURE.md);
 методология и результаты evals — в [EVALS.md](EVALS.md).
 
-![Скриншот рекомендации](docs/screenshot-recommendation.png)
+![Вечер: UV нет, маршрут на мини-карте](docs/screenshot-chat-night.png)
+![День: маршруты с долей тени](docs/screenshot-chat-day.png)
 
 ## Что делает
 
@@ -49,7 +50,7 @@
 | LangSmith-трейсинг | `agent-service/app/tracing.py` (задать `LANGCHAIN_API_KEY` в `.env`) |
 | Golden dataset (30 примеров) + evals | `evals/golden_dataset.json`, `evals/run_evals.py`, [EVALS.md](EVALS.md) |
 | A/B эксперимент | `evals/ab_test.py`, [EVALS.md](EVALS.md) |
-| Обоснованный выбор LLM и гиперпараметров | [ARCHITECTURE.md](ARCHITECTURE.md) §3, `app/config.py` |
+| Обоснованный выбор LLM и гиперпараметров | [ARCHITECTURE.md](ARCHITECTURE.md) §3, эксперимент temperature/top_p/max_tokens — [EVALS.md](EVALS.md), `evals/hyperparams.py` |
 | Guardrails | `agent-service/app/guardrails.py` |
 | Fallback между моделями | `app/config.py:call_with_fallback` — реально сработал, см. EVALS.md |
 | Docker / docker-compose | `Dockerfile`, `docker-compose.yml` |
@@ -94,6 +95,7 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 cd evals
 python run_evals.py     # -> results/results.json
+python hyperparams.py   # -> results/hyperparams_results.json (temperature/top_p/max_tokens)
 python ab_test.py       # -> results/ab_test_results.json
 ```
 

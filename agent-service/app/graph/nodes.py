@@ -143,7 +143,8 @@ async def compose_response(state: SunProtectorState) -> dict:
     if routes:
         best = routes[0]
         context_parts.append(
-            f"Лучший маршрут: {best['distance_m']}м, {best['duration_min']}мин, доля тени={best['shade_fraction']*100:.0f}%"
+            f"Лучший маршрут: {best['distance_m']}м, {best['duration_min']}мин, доля тени="
+            + (f"{best['shade_fraction']*100:.0f}%" if best["shade_fraction"] is not None else "не посчитана")
         )
     if state.get("urgent_message"):
         context_parts.append(f"СРОЧНО (скажи первым): {state['urgent_message']}")

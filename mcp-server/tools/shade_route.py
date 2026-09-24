@@ -24,6 +24,7 @@ as a known simplification in ARCHITECTURE.md.
 """
 from __future__ import annotations
 
+import asyncio
 import math
 from datetime import datetime, timezone
 
@@ -87,6 +88,8 @@ def _bearing(lat1, lon1, lat2, lon2) -> float:
 
 
 SHADE_RADIUS_M = 60
+# Публичный Overpass бывает перегружен (504) — не держим пользователя дольше этого.
+BUILDINGS_TIMEOUT_S = 20
 MAX_SAMPLES_PER_ROUTE = 40
 
 
@@ -144,14 +147,20 @@ async def get_shade_route(
             samples.append([(lat, lon) for lon, lat in coords[::step]] or [(lat, lon) for lon, lat in coords])
 
         buildings = []
+        shade_known = True
         if sun_el > 0:
-            buildings = await _fetch_buildings_along(client, samples)
+            try:
+                buildings = await asyncio.wait_for(_fetch_buildings_along(client, samples), BUILDINGS_TIMEOUT_S)
+            except Exception:  # noqa: BLE001 — таймаут/504: маршрут отдаём без оценки тени
+                shade_known = False
 
         scored_routes = []
         for route, sampled in zip(routes, samples):
             if sun_el <= 0:
                 # sun below horizon -> treat whole route as "shaded" (no direct UV)
                 shade_fraction = 1.0
+            elif not shade_known:
+                shade_fraction = None
             else:
                 shaded_count = 0
                 for lat1, lon1 in sampled:
@@ -171,12 +180,12 @@ async def get_shade_route(
                 {
                     "distance_m": round(route["distance"]),
                     "duration_min": round(route["duration"] / 60, 1),
-                    "shade_fraction": round(shade_fraction, 2),
+                    "shade_fraction": round(shade_fraction, 2) if shade_fraction is not None else None,
                     "geometry": route["geometry"],
                 }
             )
 
-    scored_routes.sort(key=lambda r: (-r["shade_fraction"], r["distance_m"]))
+    scored_routes.sort(key=lambda r: (-(r["shade_fraction"] or 0), r["distance_m"]))
     return {
         "origin": {"lat": origin_lat, "lon": origin_lon},
         "destination": {"lat": dest_lat, "lon": dest_lon},
