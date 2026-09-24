@@ -32,6 +32,7 @@ import json
 import math
 import os
 import re
+import sys
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -305,14 +306,16 @@ async def get_shade_route(
             samples.append([(lat, lon) for lon, lat in coords[::step]] or [(lat, lon) for lon, lat in coords])
 
         buildings, outline_mode = [], None
-        shade_known = True
+        shade_known, shade_error = True, None
         if sun_el > 0:
             try:
                 buildings, outline_mode = await asyncio.wait_for(
                     _fetch_buildings_along(client, samples, _search_radius(sun_el)), BUILDINGS_TIMEOUT_S
                 )
-            except Exception:  # noqa: BLE001 — таймаут/504: маршрут отдаём без оценки тени
+            except Exception as exc:  # noqa: BLE001 — таймаут/504: маршрут отдаём без оценки тени
                 shade_known = False
+                shade_error = f"{type(exc).__name__}: {exc}"[:300]
+                print(f"shade: buildings fetch failed: {shade_error}", file=sys.stderr, flush=True)
 
         scored_routes = []
         for route, sampled in zip(routes, samples):
@@ -330,6 +333,7 @@ async def get_shade_route(
                     "distance_m": round(route["distance"]),
                     "duration_min": round(route["duration"] / 60, 1),
                     "shade_fraction": round(shade_fraction, 2) if shade_fraction is not None else None,
+                    "shade_error": shade_error,
                     "geometry": route["geometry"],
                 }
             )
@@ -342,6 +346,7 @@ async def get_shade_route(
         "sun_elevation_deg": round(sun_el, 1),
         "routes": scored_routes,
         "recommended_route_index": 0 if scored_routes else None,
+        "shade_error": shade_error,
         "buildings_used": len(buildings),
         "building_shapes": outline_mode,  # "outline" — контуры из OSM, "center" — квадраты вокруг центров
         "height_known_share": round(sum(b["height_known"] for b in buildings) / len(buildings), 2) if buildings else None,
