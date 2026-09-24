@@ -1,6 +1,6 @@
 ---
 name: sunscreen-reapplication-advisor
-description: Calculates safe sun-exposure time and sunscreen reapplication timing from Fitzpatrick skin phototype, UV index, and time already spent outside. Use whenever the user asks about sunburn risk, "when should I reapply sunscreen", "how long can I stay in the sun", or gives skin type + UV index + time outside in a free-form question rather than through the app's structured /api/recommend call.
+description: Calculates safe sun-exposure time and sunscreen reapplication timing from Fitzpatrick skin phototype, UV index, and time already spent outside. Use whenever the user asks about sunburn risk, "when should I reapply sunscreen", "how long can I stay in the sun", or gives skin type + UV index + time outside in a free-form question (in any language, e.g. Russian: «когда обновить крем», «сколько можно на солнце»).
 ---
 
 # Sunscreen Reapplication Advisor
@@ -53,7 +53,7 @@ risk_ratio = minutes_already_outside / safe_exposure_minutes
 
 ## Step 5 — Respond
 
-State plainly:
+State plainly, in the user's language:
 1. The risk band and what it means practically (seek shade? SPF level?).
 2. How many more minutes they can safely stay out unprotected at this UV.
 3. When they next need to reapply sunscreen (or apply it now).
@@ -67,6 +67,6 @@ clinical instrument.
 
 > Input: phototype II, UV index 7, 45 minutes outside already, sunscreen applied 100 minutes ago.
 > safe_exposure_minutes = 100 / 7 ≈ 14.3
-> risk_ratio = 45 / 14.3 ≈ 3.1 → UV 7 alone already puts this at **high**, and the ratio pushes it to **very_high**.
+> risk_ratio = 45 / 14.3 ≈ 3.1 → UV 7 alone would be **high**, but the ratio is ≥ 1.5, so Step 3 gives **extreme**.
 > minutes_until_reapply = 120 - 100 = 20 minutes.
-> Response: "This is very-high risk for your skin type at UV 7 — you're well past your safe unprotected window. Move to shade now if possible, and your sunscreen is due for reapplication in about 20 minutes regardless."
+> Response: "This is extreme risk for your skin type at UV 7 — you've been out about three times longer than your safe unprotected window. Move to shade now, and your sunscreen is due for reapplication in about 20 minutes."
