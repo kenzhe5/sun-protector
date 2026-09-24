@@ -45,9 +45,11 @@ async def get_shade_route_tool(
     origin_lat: float, origin_lon: float, dest_lat: float, dest_lon: float
 ) -> dict:
     """Get walking route alternatives between two points, ranked by estimated
-    shade coverage (using current sun position + building data), not just
-    shortest distance. Returns each alternative's distance, duration, and
-    shade_fraction (0-1).
+    shade coverage, not just shortest distance. Shade = 2D shadow ray casting:
+    current sun position (NOAA) + OpenStreetMap building outlines and heights
+    (height / building:levels, defaults by type). Returns each alternative's
+    distance, duration and shade_fraction (0-1), plus how many buildings had
+    a known height.
     """
     return await get_shade_route(origin_lat, origin_lon, dest_lat, dest_lon)
 

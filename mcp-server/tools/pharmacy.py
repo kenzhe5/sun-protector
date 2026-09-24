@@ -10,9 +10,10 @@ import asyncio
 
 import httpx
 
+# Зеркала overpass.kumi.systems / private.coffee / maps.mail.ru на 2026-09-24 не
+# отвечали за 30 с — повторяем запрос к основному серверу, а не ждём мёртвое зеркало.
 OVERPASS_MIRRORS = [
     "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
 ]
 
 
