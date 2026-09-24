@@ -1,0 +1,16 @@
+# Образ для Vercel (container image, тариф Hobby).
+# Vercel присылает трафик на порт из $PORT (по умолчанию 80) и может усыпить
+# контейнер после простоя, поэтому база знаний (Chroma) собирается при старте.
+FROM python:3.11-slim
+WORKDIR /app
+
+COPY agent-service/requirements.txt agent-service/requirements.txt
+COPY mcp-server/requirements.txt mcp-server/requirements.txt
+RUN pip install --no-cache-dir -r agent-service/requirements.txt -r mcp-server/requirements.txt
+
+COPY agent-service agent-service
+COPY mcp-server mcp-server
+COPY frontend frontend
+
+WORKDIR /app/agent-service
+CMD ["sh", "-c", "python -m app.rag.ingest && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-80}"]

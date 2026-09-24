@@ -1,0 +1,9 @@
+# На Vercel отправляем только то, что нужно для сборки образа
+/*
+!Dockerfile.vercel
+!agent-service
+!mcp-server
+!frontend
+agent-service/data/chroma
+**/__pycache__
+**/*.pyc
