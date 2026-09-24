@@ -180,7 +180,7 @@ async def ask(req: AskRequest):
         HumanMessage(content=f"Контекст гайдлайнов:\n{context}\n\nВопрос: {guarded_in.text}"),
     ]
     result, model_used = await config.call_with_fallback(messages)
-    guarded_out = check_output(result.content)
+    guarded_out = check_output(config.text_of(result))
     return {
         "answer": guarded_out.text,
         "sources": [{"source": d.metadata.get("source"), "excerpt": d.page_content[:200]} for d in docs],

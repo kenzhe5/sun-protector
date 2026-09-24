@@ -91,16 +91,16 @@ async def _score_prompt(prompt_template: str, case: dict, risk) -> dict:
                     uv=inp["uv_index"],
                     minutes_outside=inp["minutes_outside"],
                     expected_band=case["expected_risk_band"],
-                    advice=result.content,
+                    advice=config.text_of(result),
                 )
             )
         ]
     )
     try:
-        score = int("".join(c for c in judge_result.content if c.isdigit())[:1] or "0")
+        score = int("".join(c for c in config.text_of(judge_result) if c.isdigit())[:1] or "0")
     except ValueError:
         score = 0
-    return {"latency_s": round(latency, 2), "judge_score": score, "advice": result.content, "model_used": model_used}
+    return {"latency_s": round(latency, 2), "judge_score": score, "advice": config.text_of(result), "model_used": model_used}
 
 
 async def run():

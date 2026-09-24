@@ -157,7 +157,7 @@ async def compose_response(state: SunProtectorState) -> dict:
     messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content="\n".join(context_parts))]
 
     result, model_used = await config.call_with_fallback(messages)
-    guarded = check_output(result.content)
+    guarded = check_output(config.text_of(result))
 
     return {
         "final_recommendation": guarded.text,

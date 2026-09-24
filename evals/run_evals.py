@@ -87,7 +87,7 @@ async def run():
             ),
         ]
         advice_result, model_used = await config.call_with_fallback(advice_messages, max_tokens=200)
-        advice_text = advice_result.content
+        advice_text = config.text_of(advice_result)
 
         judge_result = await config.call_fast_with_fallback(
             [
@@ -104,7 +104,7 @@ async def run():
             ]
         )
         try:
-            score = int("".join(c for c in judge_result.content if c.isdigit())[:1] or "0")
+            score = int("".join(c for c in config.text_of(judge_result) if c.isdigit())[:1] or "0")
         except ValueError:
             score = 0
         judge_scores.append(score)

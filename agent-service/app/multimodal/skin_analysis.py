@@ -42,7 +42,7 @@ async def analyze_skin_photo(image_bytes: bytes, media_type: str = "image/jpeg")
         ]
     )
     result, _model = await config.call_with_fallback([message], temperature=0.0, max_tokens=200)
-    text = result.content if isinstance(result.content, str) else str(result.content)
+    text = config.text_of(result)
     return _parse(text)
 
 

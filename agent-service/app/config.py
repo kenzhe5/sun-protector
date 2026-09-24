@@ -41,11 +41,12 @@ FAST_MODEL = os.getenv("FAST_MODEL", "claude-haiku-4-5-20251001")
 FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "gpt-4o-mini")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
-# temperature=0: по эксперименту evals/hyperparams.py качество как при 0.2
-# (судья 4.17 vs 4.20 — в пределах шума), а стабильность ответов выше
-# (0.79 vs 0.60). Для советов по безопасности важнее одинаковый ответ на
-# одинаковый вопрос. top_p не трогаем (1.0): провайдеры советуют настраивать
-# что-то одно — temperature или top_p. Подробности — EVALS.md.
+# temperature=0 — для моделей, которые её принимают (fallback gpt-4o-mini,
+# судья Claude Haiku 4.5): по эксперименту evals/hyperparams.py качество как
+# при 0.2 (судья 4.17 vs 4.20 — в пределах шума), а стабильность ответов выше
+# (0.79 vs 0.60). У основной модели Claude Sonnet 5 temperature/top_p/top_k
+# убраны самим Anthropic (запрос с ними — ошибка 400), поэтому ей их не
+# передаём. Подробности — EVALS.md.
 DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "0.0"))
 DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "1024"))
 
@@ -60,11 +61,13 @@ MCP_SERVER_ARGS = os.getenv("MCP_SERVER_ARGS", os.path.join(_ROOT, "mcp-server",
 def get_primary_llm(temperature: float | None = None, max_tokens: int | None = None):
     from langchain_anthropic import ChatAnthropic
 
+    # Sonnet 5: без temperature (не поддерживается) и без размышлений —
+    # ответы короткие, риск считает формула, а размышления добавляют задержку.
     return ChatAnthropic(
         model=PRIMARY_MODEL,
         api_key=ANTHROPIC_API_KEY,
-        temperature=temperature if temperature is not None else DEFAULT_TEMPERATURE,
         max_tokens=max_tokens or DEFAULT_MAX_TOKENS,
+        thinking={"type": "disabled"},
     )
 
 
@@ -129,3 +132,11 @@ async def call_fast_with_fallback(messages, temperature: float = 0.0, max_tokens
     except Exception:  # noqa: BLE001
         fallback = get_fallback_llm(temperature, max_tokens)
         return await fallback.ainvoke(messages)
+
+
+def text_of(message) -> str:
+    """Текст ответа модели: content бывает строкой или списком блоков."""
+    content = message.content
+    if isinstance(content, str):
+        return content
+    return "".join(part.get("text", "") for part in content if isinstance(part, dict))

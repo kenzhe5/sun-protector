@@ -37,6 +37,8 @@ CONCURRENCY = 6
 
 # (название, temperature, max_tokens, top_p)
 CONFIGS = [
+    # у Claude Sonnet 5 temperature/top_p убраны Anthropic — меряем как есть
+    ("Claude Sonnet 5 (без temperature)", None, 300, None),
     ("t0.0", 0.0, 300, None),
     ("t0.2 (текущая)", 0.2, 300, None),
     ("t0.7", 0.7, 300, None),
@@ -80,15 +82,22 @@ def detect_band(text: str) -> str | None:
     return None
 
 
-def make_llms(temperature: float, max_tokens: int, top_p: float | None):
+def make_llms(temperature: float | None, max_tokens: int, top_p: float | None):
     extra = {"top_p": top_p} if top_p is not None else {}
-    primary = ChatAnthropic(
-        model=config.PRIMARY_MODEL, api_key=config.ANTHROPIC_API_KEY,
-        temperature=temperature, max_tokens=max_tokens, **extra,
-    )
+    if temperature is None:
+        # основная модель как в продакшене: без sampling-параметров и размышлений
+        primary = ChatAnthropic(
+            model=config.PRIMARY_MODEL, api_key=config.ANTHROPIC_API_KEY,
+            max_tokens=max_tokens, thinking={"type": "disabled"},
+        )
+    else:
+        # temperature/top_p задаются — это прогоны fallback-модели
+        # (Claude Sonnet 5 их не принимает, поэтому основная здесь не участвует)
+        primary = None
     fallback = ChatOpenAI(
         model=config.FALLBACK_MODEL, api_key=config.OPENAI_API_KEY,
-        temperature=temperature, max_tokens=max_tokens, **extra,
+        temperature=temperature if temperature is not None else config.DEFAULT_TEMPERATURE,
+        max_tokens=max_tokens, **extra,
     )
     return primary, fallback
 
@@ -101,6 +110,9 @@ def is_truncated(msg) -> bool:
 async def generate(llms, messages) -> tuple:
     primary, fallback = llms
     start = time.monotonic()
+    if primary is None:
+        msg, model = await fallback.ainvoke(messages), config.FALLBACK_MODEL
+        return msg, model, time.monotonic() - start
     try:
         msg, model = await primary.ainvoke(messages), config.PRIMARY_MODEL
     except Exception:  # noqa: BLE001 — та же стратегия fallback, что в продакшене
@@ -137,7 +149,7 @@ async def run_case(sem, llms, case: dict) -> dict:
     ]
     async with sem:
         outs = [await generate(llms, messages) for _ in range(REPEATS)]
-        texts = [m.content for m, _, _ in outs]
+        texts = [config.text_of(m) for m, _, _ in outs]
         score = await judge(case, texts[0])
     print(f"  {case['id']}: {detect_band(texts[0])} / ожидалось {case['expected_risk_band']}", flush=True)
     return {
@@ -160,7 +172,18 @@ async def run():
     sem = asyncio.Semaphore(CONCURRENCY)
     summaries, all_rows = [], {}
 
+    only = sys.argv[1].lower() if len(sys.argv) > 1 else None
+    previous = {}
+    if only and os.path.exists(RESULTS_PATH):
+        with open(RESULTS_PATH, encoding="utf-8") as f:
+            old = json.load(f)
+        previous = {s["config"]: (s, old["rows"].get(s["config"])) for s in old["summary"]}
     for name, temperature, max_tokens, top_p in CONFIGS:
+        if only and only not in name.lower():
+            if name in previous:  # остальные строки берём из прошлого прогона
+                summaries.append(previous[name][0])
+                all_rows[name] = previous[name][1]
+            continue
         print(f"== {name}", flush=True)
         llms = make_llms(temperature, max_tokens, top_p)
         rows = await asyncio.gather(*(run_case(sem, llms, c) for c in dataset))
