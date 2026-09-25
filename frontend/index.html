@@ -67,6 +67,10 @@ header {
 .route-card small { color: var(--muted); }
 .shade-bar { width: 60px; height: 8px; border-radius: 4px; background: #f1e3c4; overflow: hidden; flex-shrink: 0; }
 .shade-bar i { display: block; height: 100%; background: var(--shade); }
+.nav-status { margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: #e8f0fe; color: #1a3d7a; font-size: 14px; }
+.nav-status.warn { background: #fff4dc; color: #7a4a00; }
+.nav-status.done { background: #e4f5ea; color: #1d5e36; }
+.map-btn { background: #fff; border: none; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.3); font-size: 18px; width: 36px; height: 36px; cursor: pointer; }
 
 .composer { padding: 8px 16px 12px; border-top: 1px solid var(--border); background: var(--bg); }
 .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
@@ -128,7 +132,10 @@ const store = {
 let history = store.get("sp_history", []);               // [{role, text}]
 const places = store.get("sp_places", { home: null, work: null });
 const profile = store.get("sp_profile", { phototype: null, spfAppliedAt: null, sweating: false });
-let myLocation = null;
+let myLocation = null;   // {lat, lon} — уходит на сервер
+let myAccuracy = 0;      // точность GPS в метрах — только для круга на карте
+const geoListeners = new Set();  // карты, где рисуется синяя точка «вы здесь»
+let activeNav = null;    // как остановить текущее ведение по маршруту
 let busy = false;
 
 function remember(role, text) {
@@ -207,24 +214,144 @@ function renderRoute(el, routes, points, isDay) {
     return card;
   });
 
-  function select(sel) {
+  let sel = 0, casing = null, line = null, passed = null;
+  let nav = null;   // ведём по маршруту: {status}
+  function select(i) {
+    sel = i;
     layers.clearLayers();
-    routes.forEach((r, i) => {
-      if (i === sel) return;
+    routes.forEach((r, j) => {
+      if (j === sel) return;
       L.polyline(r.geometry.coordinates.map((c) => [c[1], c[0]]), { color: "#8a9599", weight: 4, opacity: .6 })
-        .on("click", () => select(i)).addTo(layers);
+        .on("click", () => select(j)).addTo(layers);
     });
     const coords = routes[sel].geometry.coordinates.map((c) => [c[1], c[0]]);
-    L.polyline(coords, { color: "#fff", weight: 9 }).addTo(layers);
-    L.polyline(coords, { color: "#2c5f6f", weight: 5 }).addTo(layers);
+    passed = L.polyline([coords[0], coords[0]], { color: "#8a9599", weight: 5, dashArray: "6 8" }).addTo(layers);
+    casing = L.polyline(coords, { color: "#fff", weight: 9 }).addTo(layers);
+    line = L.polyline(coords, { color: "#2c5f6f", weight: 5 }).addTo(layers);
     if (points?.origin) dot(points.origin, "#2e9d5b").bindTooltip(points.origin.label || "Старт").addTo(layers);
     if (points?.destination) dot(points.destination, "#e0473c").bindTooltip(points.destination.label || "Финиш").addTo(layers);
-    map.fitBounds(L.latLngBounds(coords), { padding: [20, 20] });
+    if (nav) updateNav(); else map.fitBounds(L.latLngBounds(coords), { padding: [20, 20] });
     cards.forEach((c, j) => c.classList.toggle("selected", j === sel));
   }
+
+  // --- «Я здесь»: синяя точка двигается вместе с человеком ---
+  const halo = L.circle([0, 0], { radius: 1, stroke: false, fillColor: "#1a73e8", fillOpacity: .15, interactive: false });
+  const me = L.circleMarker([0, 0], { radius: 8, color: "#fff", weight: 3, fillColor: "#1a73e8", fillOpacity: 1 }).bindTooltip("Вы здесь");
+  let follow = false;   // карта сама едет за человеком
+  const center = L.control({ position: "bottomright" });
+  center.onAdd = () => {
+    const b = L.DomUtil.create("button", "map-btn");
+    b.type = "button"; b.title = "Где я"; b.textContent = "🎯";
+    L.DomEvent.on(b, "click", (e) => {
+      L.DomEvent.stop(e);
+      if (!myLocation) return startGeo();
+      follow = true;
+      map.setView([myLocation.lat, myLocation.lon], Math.max(map.getZoom(), 17));
+    });
+    return b;
+  };
+  center.addTo(map);
+  map.on("dragstart", () => { follow = false; });
+
+  function onMove(loc) {
+    if (!map.hasLayer(me)) { me.addTo(map); halo.addTo(map); }
+    me.setLatLng([loc.lat, loc.lon]);
+    halo.setLatLng([loc.lat, loc.lon]).setRadius(Math.max(myAccuracy, 1));
+    if (nav) updateNav();
+    if (follow) map.setView([loc.lat, loc.lon], nav ? Math.max(map.getZoom(), 17) : map.getZoom(), { animate: false });
+  }
+
+  // --- Ведение по маршруту ---
+  function updateNav() {
+    if (!myLocation) { nav.status.className = "nav-status"; nav.status.textContent = "📍 Ищу, где вы…"; return; }
+    const r = routes[sel];
+    const coords = r.geometry.coordinates.map((c) => [c[1], c[0]]);
+    const p = progressOnRoute(coords, myLocation);
+    passed.setLatLngs([...coords.slice(0, p.seg + 1), p.point]);
+    const rest = [p.point, ...coords.slice(p.seg + 1)];
+    casing.setLatLngs(rest);
+    line.setLatLngs(rest);
+    const min = Math.max(1, Math.round(r.duration_min * p.left / Math.max(p.total, 1)));
+    if (p.left < 30) {
+      nav.status.className = "nav-status done";
+      nav.status.textContent = "🎉 Вы на месте!";
+      navigator.vibrate?.(300);
+      stopNav(false);
+    } else if (p.off > 50) {
+      nav.status.className = "nav-status warn";
+      nav.status.textContent = `⚠️ Вы отошли от маршрута на ${Math.round(p.off)} м — вернитесь к синей линии или попросите новый путь.`;
+    } else {
+      nav.status.className = "nav-status";
+      nav.status.textContent = `🧭 Осталось ${p.left >= 1000 ? (p.left / 1000).toFixed(1) + " км" : Math.round(p.left / 10) * 10 + " м"} · ~${min} мин`;
+    }
+  }
+  function startNav() {
+    activeNav?.();   // вести можно только по одному маршруту
+    nav = { status: document.createElement("div") };
+    nav.status.className = "nav-status";
+    mapDiv.after(nav.status);
+    activeNav = () => stopNav(true);
+    follow = true;
+    keepScreenOn(true);
+    if (myLocation) map.setView([myLocation.lat, myLocation.lon], 17, { animate: false });
+    else startGeo();
+    updateNav();
+    addActions(el, [["⏹ Закончить", () => stopNav(true)]]);
+    mapDiv.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function stopNav(removeStatus) {
+    if (!nav) return;
+    if (removeStatus) nav.status.remove();
+    el.querySelector(".actions")?.remove();
+    nav = null;
+    follow = false;
+    activeNav = null;
+    keepScreenOn(false);
+    const coords = routes[sel].geometry.coordinates.map((c) => [c[1], c[0]]);
+    passed.setLatLngs([coords[0], coords[0]]); casing.setLatLngs(coords); line.setLatLngs(coords);
+    addActions(el, [["🧭 Вести по маршруту", startNav]]);
+  }
+
   select(0);
+  geoListeners.add(onMove);   // точку ставим, когда у карты уже есть вид
+  if (myLocation) onMove(myLocation);
+  addActions(el, [["🧭 Вести по маршруту", startNav]]);
   scrollDown();
 }
+
+// Где человек на маршруте: насколько отошёл, сколько осталось (в метрах).
+function progressOnRoute(coords, loc) {
+  const kx = 111320 * Math.cos(loc.lat * Math.PI / 180), ky = 110540;
+  const xy = ([lat, lon]) => [(lon - loc.lon) * kx, (lat - loc.lat) * ky];   // человек — в точке (0, 0)
+  let best = { off: Infinity }, total = 0;
+  const lens = [];
+  for (let i = 0; i < coords.length - 1; i++) {
+    const [ax, ay] = xy(coords[i]), [bx, by] = xy(coords[i + 1]);
+    const dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+    const t = len2 ? Math.min(1, Math.max(0, -(ax * dx + ay * dy) / len2)) : 0;
+    const off = Math.hypot(ax + t * dx, ay + t * dy);
+    lens.push(Math.sqrt(len2));
+    if (off < best.off) best = { off, seg: i, t };
+    total += lens[i];
+  }
+  if (best.seg == null) return { off: 0, seg: 0, point: coords[0], left: 0, total: 0 };
+  const [a, b] = [coords[best.seg], coords[best.seg + 1]];
+  let left = lens[best.seg] * (1 - best.t);
+  for (let i = best.seg + 1; i < lens.length; i++) left += lens[i];
+  return { ...best, point: [a[0] + (b[0] - a[0]) * best.t, a[1] + (b[1] - a[1]) * best.t], left, total };
+}
+
+// Экран не гаснет, пока ведём по маршруту.
+let wakeLock = null;
+async function keepScreenOn(on) {
+  try {
+    if (on && !wakeLock) wakeLock = await navigator.wakeLock?.request("screen");
+    if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch { wakeLock = null; }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && activeNav) { wakeLock = null; keepScreenOn(true); }
+});
 
 // ---------- Отправка в чат ----------
 async function send(text) {
@@ -385,15 +512,64 @@ $("newChat").onclick = () => {
 if (history.length) history.forEach((m) => (m.role === "user" ? bubble("user", `<div class="text">${esc(m.text)}</div>`) : botSay(m.text, { save: false })));
 else greet();
 
-loadSun(43.2389, 76.8897); // Алматы, пока нет геолокации
-navigator.geolocation?.getCurrentPosition(
-  (pos) => {
-    myLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+// ---------- Геолокация: следим за человеком, пока открыт сайт ----------
+let geoWatch = null;
+let geoAsked = false;
+let geoComplained = false;   // человек сам нажал «Включить» — тогда отвечаем в чате
+function startGeo() {
+  if (!navigator.geolocation)
+    return botSay("Этот браузер не умеет определять местоположение. Напишите адрес — проложу путь от него.", { save: false });
+  geoAsked = true;
+  watchGeo();
+}
+function watchGeo() {
+  if (geoWatch == null) geoWatch = navigator.geolocation.watchPosition(onPosition, onGeoError, { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 });
+}
+function onPosition(pos) {
+  const first = !myLocation;
+  myLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+  myAccuracy = pos.coords.accuracy || 0;
+  store.set("sp_geo", "on");
+  if (first) {
     loadSun(myLocation.lat, myLocation.lon);
-  },
-  () => {}, // без геолокации бот спросит адрес
-  { timeout: 8000 }
-);
+    if (geoAsked) botSay("📍 Нашёл, где вы. Теперь путь строю от вашего места, а на карте вы — синяя точка, она двигается вместе с вами.", { save: false });
+  }
+  geoListeners.forEach((fn) => fn(myLocation));
+}
+function onGeoError(err) {
+  if (err.code !== err.PERMISSION_DENIED) {
+    // GPS на миг потерял сигнал — продолжаем следить; жалуемся, только если так и не нашли человека
+    if (geoAsked && !myLocation && !geoComplained) {
+      geoComplained = true;
+      botSay("Пока не получается определить, где вы. Проверьте, включена ли геолокация на телефоне, или напишите адрес.", { save: false });
+    }
+    return;
+  }
+  navigator.geolocation.clearWatch(geoWatch);
+  geoWatch = null;
+  store.set("sp_geo", null);
+  if (geoAsked) botSay("Браузер не дал доступ к местоположению. Разрешите его в настройках сайта (значок 🔒 или «аА» рядом с адресом) и нажмите 🎯 на карте — или просто напишите адрес.", { save: false });
+}
+function askGeo() {
+  botSay("Включить геолокацию? Я сам найду, где вы, построю путь от вашего места и поведу по нему — точка на карте будет двигаться вместе с вами.", {
+    save: false,
+    actions: [
+      ["📍 Включить", startGeo],
+      ["Не сейчас", () => botSay("Хорошо. Тогда пишите адрес, откуда идёте. Включить можно кнопкой 🎯 на карте маршрута.", { save: false })],
+    ],
+  });
+}
+async function initGeo() {
+  if (!navigator.geolocation) return;
+  let state = null;
+  try { state = (await navigator.permissions.query({ name: "geolocation" })).state; } catch {}
+  if (state === "granted" || (state == null && store.get("sp_geo") === "on")) {
+    watchGeo();
+  } else if (state !== "denied") askGeo();
+}
+
+loadSun(43.2389, 76.8897); // Алматы, пока нет геолокации
+initGeo();
 </script>
 </body>
 </html>
